@@ -19,7 +19,7 @@ from api_models import (
     UserCreate, User, ApplicationCreate, ApplicationUpdate, Application, 
     ScheduleCreate, ScheduleUpdate, Schedule, AnalysisRunCreate, AnalysisRun, 
     AnalysisRunResponse, DashboardStats, ContextComparison, Token, LoginRequest,
-    SourceCodeResponse, HighlightedLink, ParentChildRelationships
+    SourceCodeResponse, HighlightedLink, ParentChildRelationships, AnalysisStatus
 )
 from database_schema import get_database, DatabaseManager
 from analysis_engine import AnalysisEngine
