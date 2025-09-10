@@ -26,7 +26,11 @@ class AnalysisEngine:
         max_pages_to_crawl: int = 100,
         max_links_to_validate: int = 200,
         enable_ai_evaluation: bool = False,
-        max_ai_evaluation_pages: int = 10
+        max_ai_evaluation_pages: int = 10,
+        extract_static: bool = True,
+        extract_dynamic: bool = False,
+        extract_resources: bool = False,
+        extract_external: bool = False
     ) -> Dict[str, Any]:
         """Run website analysis with specified parameters"""
         
@@ -51,7 +55,11 @@ class AnalysisEngine:
                 max_depth=max_depth,
                 include_screenshots=False,
                 max_pages_to_crawl=max_pages_to_crawl,
-                max_links_to_validate=max_links_to_validate
+                max_links_to_validate=max_links_to_validate,
+                extract_static=extract_static,
+                extract_dynamic=extract_dynamic,
+                extract_resources=extract_resources,
+                extract_external=extract_external
             )
             
             # Add run_id to results

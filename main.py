@@ -42,7 +42,8 @@ class WebsiteInsightsPlatform:
         self.db = None
         self.change_detector = ChangeDetector()
     
-    async def analyze_website(self, url: str, max_depth: int = None, include_screenshots: bool = False, max_pages_to_crawl: int = None, max_links_to_validate: int = None) -> Dict[str, Any]:
+    async def analyze_website(self, url: str, max_depth: int = None, include_screenshots: bool = False, max_pages_to_crawl: int = None, max_links_to_validate: int = None,
+                             extract_static: bool = True, extract_dynamic: bool = False, extract_resources: bool = False, extract_external: bool = False) -> Dict[str, Any]:
         """Main method to analyze a website comprehensively"""
         logger.info(f"Starting comprehensive analysis of {url}")
         
@@ -59,7 +60,8 @@ class WebsiteInsightsPlatform:
         try:
             # Step 1: Crawl the website
             logger.info("Step 1: Crawling website...")
-            crawl_results = await self._crawl_website(url, max_depth, max_pages_to_crawl, max_links_to_validate)
+            crawl_results = await self._crawl_website(url, max_depth, max_pages_to_crawl, max_links_to_validate,
+                                                     extract_static, extract_dynamic, extract_resources, extract_external)
             
             
             # Step 2: Validate links (always run for all pages)
@@ -121,10 +123,12 @@ class WebsiteInsightsPlatform:
             logger.error(f"Error during website analysis: {e}")
             raise
     
-    async def _crawl_website(self, url: str, max_depth: int = None, max_pages_to_crawl: int = None, max_links_to_validate: int = None) -> Dict[str, Any]:
-        """Crawl the website and extract all pages and links"""
+    async def _crawl_website(self, url: str, max_depth: int = None, max_pages_to_crawl: int = None, max_links_to_validate: int = None,
+                            extract_static: bool = True, extract_dynamic: bool = False, extract_resources: bool = False, extract_external: bool = False) -> Dict[str, Any]:
+        """Crawl the website and extract all pages and links with configurable link types"""
         async with WebsiteCrawler() as crawler:
-            return await crawler.crawl_website(url, max_depth, max_pages_to_crawl, max_links_to_validate)
+            return await crawler.crawl_website(url, max_depth, max_pages_to_crawl, max_links_to_validate,
+                                             extract_static, extract_dynamic, extract_resources, extract_external)
     
     async def _validate_links(self, links) -> list:
         """Validate all discovered links"""

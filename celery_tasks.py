@@ -127,7 +127,11 @@ async def _run_analysis_async(task, run_id: str, application_data: Dict[str, Any
             max_pages_to_crawl=application_data["max_pages_to_crawl"],
             max_links_to_validate=application_data["max_links_to_validate"],
             enable_ai_evaluation=application_data["enable_ai_evaluation"],
-            max_ai_evaluation_pages=application_data["max_ai_evaluation_pages"]
+            max_ai_evaluation_pages=application_data["max_ai_evaluation_pages"],
+            extract_static=application_data.get("extract_static_links", True),
+            extract_dynamic=application_data.get("extract_dynamic_links", False),
+            extract_resources=application_data.get("extract_resource_links", False),
+            extract_external=application_data.get("extract_external_links", False)
         )
         logger.info(f"Analysis completed successfully for run {run_id}")
         

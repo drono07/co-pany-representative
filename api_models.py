@@ -51,6 +51,12 @@ class ApplicationBase(BaseModel):
     enable_ai_evaluation: bool = False
     max_ai_evaluation_pages: int = Field(default=10, ge=1, le=50)
     
+    # Link extraction configuration
+    extract_static_links: bool = Field(default=True, description="Extract links from static HTML (a, link, area tags)")
+    extract_dynamic_links: bool = Field(default=False, description="Extract links from JavaScript (onclick, data attributes, script content)")
+    extract_resource_links: bool = Field(default=False, description="Extract resource links (images, CSS, JS files)")
+    extract_external_links: bool = Field(default=False, description="Extract links to external domains")
+    
     @field_validator('max_links_to_validate')
     @classmethod
     def validate_links_to_pages_ratio(cls, v, info):

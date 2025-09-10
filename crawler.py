@@ -9,7 +9,7 @@ import logging
 from tqdm import tqdm
 from datetime import datetime
 
-from models import Link, LinkStatus, PageContent, PageType
+from models import Link, LinkStatus, LinkType, PageContent, PageType
 from config import settings
 from path_tracker import PathTracker
 from html_structure_extractor import HTMLStructureExtractor
@@ -249,50 +249,198 @@ class WebsiteCrawler:
         async with semaphore:
             return await self.fetch_page(url)
     
-    def extract_links(self, html_content: str, base_url: str) -> List[str]:
-        """Extract all links from HTML content"""
+    def extract_links(self, html_content: str, base_url: str, 
+                     extract_static: bool = True, 
+                     extract_dynamic: bool = False, 
+                     extract_resources: bool = False, 
+                     extract_external: bool = False) -> List[Dict[str, any]]:
+        """Extract links from HTML content with configurable types"""
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
             links = []
             
-            # Extract from various tag types
-            for tag in soup.find_all(['a', 'link', 'area']):
-                href = tag.get('href')
-                if href:
-                    # Convert relative URLs to absolute
-                    absolute_url = urljoin(base_url, href)
-                    links.append(absolute_url)
+            # Extract static HTML links (default behavior)
+            if extract_static:
+                static_links = self._extract_static_links(soup, base_url)
+                links.extend(static_links)
             
-            # Also check for onclick handlers and data attributes that might contain URLs
-            for tag in soup.find_all(attrs={'onclick': True}):
-                onclick = tag.get('onclick', '')
-                # Look for URLs in onclick handlers
-                import re
-                url_pattern = r'https?://[^\s\'"]+'
-                urls = re.findall(url_pattern, onclick)
-                for url in urls:
-                    links.append(url)
+            # Extract dynamic JavaScript links
+            if extract_dynamic:
+                dynamic_links = self._extract_dynamic_links(soup, base_url)
+                links.extend(dynamic_links)
             
-            # Check for data attributes that might contain URLs
-            for tag in soup.find_all(attrs={'data-url': True}):
-                data_url = tag.get('data-url')
-                if data_url:
-                    absolute_url = urljoin(base_url, data_url)
-                    links.append(absolute_url)
+            # Extract resource links
+            if extract_resources:
+                resource_links = self._extract_resource_links(soup, base_url)
+                links.extend(resource_links)
+            
+            # Filter external links if not requested
+            if not extract_external:
+                base_domain = urlparse(base_url).netloc
+                links = [link for link in links if self._is_same_domain(link['url'], base_domain)]
             
             # Remove duplicates while preserving order
             seen = set()
             unique_links = []
             for link in links:
-                if link not in seen:
-                    seen.add(link)
+                if link['url'] not in seen:
+                    seen.add(link['url'])
                     unique_links.append(link)
             
-            logger.debug(f"Extracted {len(unique_links)} links from {base_url}")
+            logger.debug(f"Extracted {len(unique_links)} links from {base_url} (static: {extract_static}, dynamic: {extract_dynamic}, resources: {extract_resources})")
             return unique_links
         except Exception as e:
             logger.error(f"Error extracting links from {base_url}: {str(e)}")
             return []
+    
+    def _extract_static_links(self, soup: BeautifulSoup, base_url: str) -> List[Dict[str, any]]:
+        """Extract links from static HTML tags (a, link, area)"""
+        links = []
+        
+        for tag in soup.find_all(['a', 'link', 'area']):
+            href = tag.get('href')
+            if href:
+                absolute_url = urljoin(base_url, href)
+                if self._is_valid_link(absolute_url):
+                    links.append({
+                        'url': absolute_url,
+                        'type': LinkType.STATIC_HTML,
+                        'context': f"HTML tag: {tag.name}",
+                        'title': tag.get('title', '') or tag.get_text().strip()[:100]
+                    })
+        
+        return links
+    
+    def _extract_dynamic_links(self, soup: BeautifulSoup, base_url: str) -> List[Dict[str, any]]:
+        """Extract links from JavaScript and dynamic content"""
+        links = []
+        import re
+        
+        # Extract from onclick handlers
+        for tag in soup.find_all(attrs={'onclick': True}):
+            onclick = tag.get('onclick', '')
+            url_pattern = r'https?://[^\s\'"]+'
+            urls = re.findall(url_pattern, onclick)
+            for url in urls:
+                if self._is_valid_link(url):
+                    links.append({
+                        'url': url,
+                        'type': LinkType.DYNAMIC_JS,
+                        'context': f"onclick handler: {onclick[:100]}...",
+                        'title': tag.get('title', '') or tag.get_text().strip()[:100]
+                    })
+        
+        # Extract from data attributes
+        for tag in soup.find_all(attrs={'data-url': True}):
+            data_url = tag.get('data-url')
+            if data_url:
+                absolute_url = urljoin(base_url, data_url)
+                if self._is_valid_link(absolute_url):
+                    links.append({
+                        'url': absolute_url,
+                        'type': LinkType.DYNAMIC_JS,
+                        'context': f"data-url attribute",
+                        'title': tag.get('title', '') or tag.get_text().strip()[:100]
+                    })
+        
+        # Extract from script content
+        for script in soup.find_all('script'):
+            if script.string:
+                script_content = script.string
+                url_pattern = r'https?://[^\s\'"]+'
+                urls = re.findall(url_pattern, script_content)
+                for url in urls:
+                    if self._is_valid_link(url):
+                        links.append({
+                            'url': url,
+                            'type': LinkType.DYNAMIC_JS,
+                            'context': f"JavaScript content: {script_content[:100]}...",
+                            'title': 'JavaScript-generated link'
+                        })
+        
+        return links
+    
+    def _extract_resource_links(self, soup: BeautifulSoup, base_url: str) -> List[Dict[str, any]]:
+        """Extract resource links (images, CSS, JS files)"""
+        links = []
+        
+        # Extract from img tags
+        for img in soup.find_all('img'):
+            src = img.get('src')
+            if src:
+                absolute_url = urljoin(base_url, src)
+                if self._is_resource_link(absolute_url):
+                    links.append({
+                        'url': absolute_url,
+                        'type': LinkType.RESOURCE,
+                        'context': f"img src",
+                        'title': img.get('alt', '') or 'Image'
+                    })
+        
+        # Extract from link tags (CSS)
+        for link in soup.find_all('link', rel='stylesheet'):
+            href = link.get('href')
+            if href:
+                absolute_url = urljoin(base_url, href)
+                if self._is_resource_link(absolute_url):
+                    links.append({
+                        'url': absolute_url,
+                        'type': LinkType.RESOURCE,
+                        'context': f"CSS stylesheet",
+                        'title': 'Stylesheet'
+                    })
+        
+        # Extract from script tags (JS)
+        for script in soup.find_all('script', src=True):
+            src = script.get('src')
+            if src:
+                absolute_url = urljoin(base_url, src)
+                if self._is_resource_link(absolute_url):
+                    links.append({
+                        'url': absolute_url,
+                        'type': LinkType.RESOURCE,
+                        'context': f"JavaScript file",
+                        'title': 'JavaScript'
+                    })
+        
+        return links
+    
+    def _is_valid_link(self, url: str) -> bool:
+        """Check if a URL is a valid page link (not a resource file)"""
+        try:
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                return False
+            
+            # Skip resource files
+            if self._is_resource_link(url):
+                return False
+            
+            return True
+        except Exception:
+            return False
+    
+    def _is_resource_link(self, url: str) -> bool:
+        """Check if a URL is a resource file"""
+        resource_extensions = [
+            '.css', '.js', '.xml', '.json', '.txt', '.csv',
+            '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp',
+            '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+            '.zip', '.rar', '.tar', '.gz', '.mp4', '.mp3', '.wav'
+        ]
+        
+        parsed = urlparse(url)
+        path = parsed.path.lower()
+        
+        return any(path.endswith(ext) for ext in resource_extensions)
+    
+    def _is_same_domain(self, url: str, base_domain: str) -> bool:
+        """Check if URL belongs to the same domain"""
+        try:
+            parsed = urlparse(url)
+            return parsed.netloc == base_domain
+        except Exception:
+            return False
     
     def extract_page_content(self, html_content: str, url: str) -> PageContent:
         """Extract and analyze page content"""
@@ -371,7 +519,8 @@ class WebsiteCrawler:
         
         return chunks
     
-    async def crawl_website(self, start_url: str, max_depth: int = None, max_pages_to_crawl: int = None, max_links_to_validate: int = None) -> Dict:
+    async def crawl_website(self, start_url: str, max_depth: int = None, max_pages_to_crawl: int = None, max_links_to_validate: int = None,
+                           extract_static: bool = True, extract_dynamic: bool = False, extract_resources: bool = False, extract_external: bool = False) -> Dict:
         """Main crawling function with adaptive batch processing"""
         if max_depth is None:
             max_depth = settings.max_crawl_depth
@@ -449,6 +598,7 @@ class WebsiteCrawler:
                         url=url,
                         status_code=result.get('status_code'),
                         status=self._determine_link_status(result.get('status_code')),
+                        link_type=LinkType.STATIC_HTML,  # Default for crawled pages
                         response_time=result.get('response_time'),
                         error_message=result.get('error')
                     )
@@ -472,8 +622,10 @@ class WebsiteCrawler:
                         # Extract new links if we haven't reached max depth
                         current_depth = self._get_url_depth(url, start_url)
                         if current_depth < max_depth:
-                            new_links = self.extract_links(result['html_content'], url)
-                            for new_link in new_links:
+                            new_links_data = self.extract_links(result['html_content'], url, 
+                                                               extract_static, extract_dynamic, extract_resources, extract_external)
+                            for link_data in new_links_data:
+                                new_link = link_data['url']
                                 normalized_link = self.normalize_url(new_link)
                                 if (self.is_valid_url(new_link, start_url) and 
                                     normalized_link not in self.visited_urls and 

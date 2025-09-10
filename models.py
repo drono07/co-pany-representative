@@ -11,6 +11,12 @@ class LinkStatus(str, Enum):
     RATE_LIMITED = "rate_limited"
     UNKNOWN = "unknown"
 
+class LinkType(str, Enum):
+    STATIC_HTML = "static_html"  # From a, link, area tags
+    DYNAMIC_JS = "dynamic_js"    # From JavaScript (onclick, data attributes, script content)
+    RESOURCE = "resource"        # Images, CSS, JS files
+    EXTERNAL = "external"        # Links to external domains
+
 class PageType(str, Enum):
     CONTENT = "content"
     BLANK = "blank"
@@ -28,12 +34,14 @@ class Link(BaseModel):
     url: str
     status_code: Optional[int] = None
     status: LinkStatus = LinkStatus.UNKNOWN
+    link_type: LinkType = LinkType.STATIC_HTML
     title: Optional[str] = None
     depth: int = 0
     parent_url: Optional[str] = None
     response_time: Optional[float] = None
     error_message: Optional[str] = None
     discovered_at: datetime = datetime.now()
+    source_context: Optional[str] = None  # Additional context about where the link was found
 
 class PageContent(BaseModel):
     url: str
