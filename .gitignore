@@ -36,7 +36,6 @@ logs/
 
 # Debug Output
 debug_output/
-*.json
 
 # IDE
 .vscode/
@@ -57,3 +56,54 @@ tests/
 # Temporary Files
 *.tmp
 *.temp
+
+# Frontend
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/.next/
+frontend/out/
+
+# Process Files
+*.pid
+celerybeat-schedule*
+
+# Analysis Exports (keep README but ignore JSON files)
+analysis_exports/*.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache
+.cache/
+.pytest_cache/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Redis
+dump.rdb
+
+# MongoDB
+data/
