@@ -28,3 +28,4 @@ python-dotenv>=1.0.0
 
 # Additional utilities
 dnspython>=2.8.0
+brotli>=1.1.0
