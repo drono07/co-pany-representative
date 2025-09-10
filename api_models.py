@@ -226,3 +226,29 @@ class TokenData(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+# Source Code Models
+class HighlightedLink(BaseModel):
+    url: str
+    start: int
+    end: int
+    type: str  # "broken", "valid", etc.
+    status_code: Optional[int] = None
+    status: str
+
+class SourceCodeResponse(BaseModel):
+    page_url: str
+    source_code: str
+    parent_url: Optional[str] = None
+    highlighted_links: List[HighlightedLink] = []
+    created_at: Optional[datetime] = None
+    actual_source_page: str  # Which page actually has the source
+    is_source_from_parent: bool  # Whether source is from parent
+    traversal_path: List[str]  # Path taken to find source
+    hierarchy_depth: int  # How many levels up we went
+
+# Parent-Child Relationship Models
+class ParentChildRelationships(BaseModel):
+    parent_map: Dict[str, str] = {}  # child_url -> parent_url
+    children_map: Dict[str, List[str]] = {}  # parent_url -> [child_urls]
+    path_map: Dict[str, List[str]] = {}  # url -> [path_to_root]

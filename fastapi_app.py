@@ -15,7 +15,12 @@ import logging
 from bson import ObjectId
 from urllib.parse import unquote
 
-from api_models import *
+from api_models import (
+    UserCreate, User, ApplicationCreate, ApplicationUpdate, Application, 
+    ScheduleCreate, ScheduleUpdate, Schedule, AnalysisRunCreate, AnalysisRun, 
+    AnalysisRunResponse, DashboardStats, ContextComparison, Token, LoginRequest,
+    SourceCodeResponse, HighlightedLink, ParentChildRelationships
+)
 from database_schema import get_database, DatabaseManager
 from analysis_engine import AnalysisEngine
 from celery_tasks import run_website_analysis, get_task_status
@@ -908,7 +913,7 @@ async def get_broken_link_details(
         logger.error(f"Error getting broken link details: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@app.get("/runs/{run_id}/source-code", response_model=dict)
+@app.get("/runs/{run_id}/source-code", response_model=SourceCodeResponse)
 async def get_page_source_code(
     run_id: str,
     page_url: str,
@@ -983,17 +988,17 @@ async def get_page_source_code(
                     })
                     start = pos + 1
         
-        return {
-            "page_url": decoded_page_url,
-            "source_code": source_code,
-            "parent_url": source_data.get("parent_url"),
-            "highlighted_links": highlighted_links,
-            "created_at": source_data.get("created_at"),
-            "actual_source_page": source_data.get("actual_source_page", decoded_page_url),  # Which page actually has the source
-            "is_source_from_parent": source_data.get("actual_source_page") != decoded_page_url,  # Whether source is from parent
-            "traversal_path": source_data.get("traversal_path", [decoded_page_url]),  # Path taken to find source
-            "hierarchy_depth": source_data.get("hierarchy_depth", 0)  # How many levels up we went
-        }
+        return SourceCodeResponse(
+            page_url=decoded_page_url,
+            source_code=source_code,
+            parent_url=source_data.get("parent_url"),
+            highlighted_links=[HighlightedLink(**link) for link in highlighted_links],
+            created_at=source_data.get("created_at"),
+            actual_source_page=source_data.get("actual_source_page", decoded_page_url),
+            is_source_from_parent=source_data.get("actual_source_page") != decoded_page_url,
+            traversal_path=source_data.get("traversal_path", [decoded_page_url]),
+            hierarchy_depth=source_data.get("hierarchy_depth", 0)
+        )
         
     except HTTPException:
         raise
@@ -1001,7 +1006,7 @@ async def get_page_source_code(
         logger.error(f"Error getting page source code: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@app.get("/runs/{run_id}/parent-child-relationships", response_model=dict)
+@app.get("/runs/{run_id}/parent-child-relationships", response_model=ParentChildRelationships)
 async def get_parent_child_relationships(
     run_id: str,
     current_user: dict = Depends(get_current_user),
@@ -1022,9 +1027,9 @@ async def get_parent_child_relationships(
         # Get relationships
         relationships = await db.get_parent_child_relationships(run_id)
         if not relationships:
-            return {"parent_map": {}, "children_map": {}, "path_map": {}}
+            return ParentChildRelationships()
         
-        return relationships
+        return ParentChildRelationships(**relationships)
         
     except HTTPException:
         raise
