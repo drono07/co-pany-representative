@@ -5,7 +5,7 @@ MongoDB setup script for website analysis
 
 import asyncio
 import os
-from database import get_database
+from database_schema import get_database
 
 async def setup_mongodb():
     """Setup MongoDB database and collections"""

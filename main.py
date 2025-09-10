@@ -15,7 +15,7 @@ from validators import LinkValidator, BlankPageDetector, ContentAnalyzer
 from content_processor import ContentProcessor
 from evaluation_system import EvaluationOrchestrator
 from config import settings
-from database import get_database
+from database_schema import get_database
 from change_detector import ChangeDetector
 
 # Set up logging
