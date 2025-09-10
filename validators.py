@@ -53,7 +53,7 @@ class LinkValidator:
             page_links = page_links[:settings.max_links_to_validate]
         
         # Process page links in parallel batches
-        batch_size = 3  # Reduced from 20 to 3 to avoid rate limiting
+        batch_size = 100  # Increased for faster processing
         rate_limited_links = []
         
         for i in range(0, len(page_links), batch_size):
@@ -89,7 +89,7 @@ class LinkValidator:
             logger.info(f"Retrying {len(rate_limited_links)} rate-limited links with smart retry strategy...")
             
             # Process rate-limited links in parallel batches
-            retry_batch_size = 2  # Reduced from 15 to 2 for retries
+            retry_batch_size = 10  # Increased for faster retry processing
             max_retry_attempts = 10  # Reasonable limit
             
             for retry_round in range(max_retry_attempts):
@@ -256,12 +256,12 @@ class BlankPageDetector:
     def _analyze_page_content(self, page: PageContent) -> PageType:
         """Analyze page content and determine if it's blank or has meaningful content"""
         
-        # Check word count
-        if page.word_count < self.min_content_threshold:
+        # FIRST: Check for common blank page indicators (HTML structure analysis)
+        if self._has_only_boilerplate_content(page):
             return PageType.BLANK
         
-        # Check for common blank page indicators
-        if self._has_only_boilerplate_content(page):
+        # SECOND: Check word count (only if HTML structure analysis passed)
+        if page.word_count < self.min_content_threshold:
             return PageType.BLANK
         
         # Check for error pages
@@ -285,6 +285,10 @@ class BlankPageDetector:
             # Remove script and style elements
             for script in soup(["script", "style"]):
                 script.decompose()
+            
+            # Check if this is a functional page (login, contact, etc.) - these should NOT be considered blank
+            if self._is_functional_page(page.url, soup):
+                return False
             
             # Extract header content
             header_content = self._extract_section_content(soup, ['header', 'nav'])
@@ -311,7 +315,8 @@ class BlankPageDetector:
                 return True
             
             # If main content is less than 10% of total content, likely blank
-            if total_words > 0 and main_words < (total_words * 0.1):
+            # But only if main_words is actually small (less than 50 words)
+            if total_words > 0 and main_words < 50 and main_words < (total_words * 0.1):
                 return True
             
             # Check if main content is just navigation or boilerplate
@@ -324,6 +329,70 @@ class BlankPageDetector:
             logger.error(f"Error analyzing HTML structure for {page.url}: {str(e)}")
             # Fallback to simple word count check
             return page.word_count < 50
+    
+    def _is_functional_page(self, url: str, soup) -> bool:
+        """Check if this is a functional page that should not be considered blank"""
+        url_lower = url.lower()
+        
+        # Check URL patterns for functional pages
+        functional_url_patterns = [
+            '/login', '/signin', '/sign-in', '/account/login',
+            '/contact', '/contact-us', '/contactus',
+            '/register', '/signup', '/sign-up', '/create-account',
+            '/checkout', '/cart', '/basket',
+            '/search', '/search-results',
+            '/subscribe', '/newsletter', '/email-signup',
+            '/privacy', '/terms', '/legal', '/policy',
+            '/sitemap', '/robots.txt',
+            '/404', '/error', '/not-found'
+        ]
+        
+        # Check if URL matches functional patterns
+        for pattern in functional_url_patterns:
+            if pattern in url_lower:
+                return True
+        
+        # Check for functional form elements
+        forms = soup.find_all('form')
+        if forms:
+            # Check if forms have meaningful content (not just search boxes or newsletter signups)
+            for form in forms:
+                form_text = form.get_text().lower()
+                # Skip simple search forms
+                if 'search' in form_text and len(form_text.split()) < 10:
+                    continue
+                # Skip newsletter/email signup forms
+                if any(word in form_text for word in ['email', 'newsletter', 'subscribe', 'signup']):
+                    continue
+                # If there's a form with substantial content, it's functional
+                if len(form_text.split()) > 20:
+                    return True
+        
+        # Check for interactive elements (but exclude navigation elements)
+        interactive_elements = soup.find_all(['input', 'button', 'select', 'textarea'])
+        # Filter out navigation buttons and common UI elements
+        meaningful_interactive = []
+        for element in interactive_elements:
+            # Skip navigation buttons, cart buttons, etc.
+            if element.get('class'):
+                classes = ' '.join(element.get('class', [])).lower()
+                if any(word in classes for word in ['nav', 'menu', 'cart', 'search', 'header', 'footer', 'drawer', 'close', 'newsletter', 'field']):
+                    continue
+            
+            # Skip buttons with common navigation text
+            if element.get_text().lower().strip() in ['shop', 'menu', 'cart', 'search', 'login', 'sign up', 'email', 'subscribe']:
+                continue
+            
+            # Skip empty buttons and inputs (likely UI elements)
+            if not element.get_text().strip() and not element.get('placeholder'):
+                continue
+                
+            meaningful_interactive.append(element)
+        
+        if len(meaningful_interactive) > 2:  # More than just basic navigation
+            return True
+        
+        return False
     
     def _extract_section_content(self, soup, tag_names):
         """Extract text content from specific HTML sections"""
@@ -344,28 +413,50 @@ class BlankPageDetector:
         return ' '.join(content_parts)
     
     def _extract_main_content(self, soup):
-        """Extract main content by removing header, footer, and navigation"""
+        """Extract main content by removing header, footer, and navigation - improved version"""
         # Create a copy to avoid modifying the original
         soup_copy = BeautifulSoup(str(soup), 'html.parser')
+        
+        # Remove script and style elements
+        for script in soup_copy(["script", "style", "noscript"]):
+            script.decompose()
         
         # Remove header, footer, nav elements
         for tag in soup_copy.find_all(['header', 'footer', 'nav']):
             tag.decompose()
         
-        # Remove elements with header/footer/nav classes or IDs
-        for element in soup_copy.find_all(['div', 'section'], class_=lambda x: x and any(
-            word in x.lower() for word in ['header', 'footer', 'nav', 'navigation', 'menu', 'top', 'bottom']
+        # Remove elements with header/footer/nav classes or IDs (more specific)
+        header_footer_keywords = [
+            'site-header', 'site-footer', 'main-nav', 'primary-nav', 'secondary-nav',
+            'breadcrumb', 'breadcrumbs', 'sidebar', 'widget', 'social', 'newsletter', 'subscribe'
+        ]
+        
+        for element in soup_copy.find_all(['div', 'section', 'aside'], class_=lambda x: x and any(
+            word in x.lower() for word in header_footer_keywords
         )):
             element.decompose()
         
-        for element in soup_copy.find_all(['div', 'section'], id=lambda x: x and any(
-            word in x.lower() for word in ['header', 'footer', 'nav', 'navigation', 'menu', 'top', 'bottom']
+        for element in soup_copy.find_all(['div', 'section', 'aside'], id=lambda x: x and any(
+            word in x.lower() for word in header_footer_keywords
         )):
             element.decompose()
         
-        # Remove common navigation patterns
+        # Remove common navigation patterns (but not main content)
         for element in soup_copy.find_all(['ul', 'ol'], class_=lambda x: x and any(
-            word in x.lower() for word in ['nav', 'menu', 'navigation']
+            word in x.lower() for word in ['nav', 'menu', 'navigation', 'breadcrumb']
+        )):
+            element.decompose()
+        
+        # Remove common e-commerce elements (but not product content)
+        ecommerce_keywords = ['cart', 'checkout', 'search', 'filter', 'sort']
+        for element in soup_copy.find_all(['div', 'section'], class_=lambda x: x and any(
+            word in x.lower() for word in ecommerce_keywords
+        )):
+            element.decompose()
+        
+        # Remove newsletter/signup sections
+        for element in soup_copy.find_all(['div', 'section'], class_=lambda x: x and any(
+            word in x.lower() for word in ['newsletter', 'signup', 'subscribe', 'email']
         )):
             element.decompose()
         
@@ -403,13 +494,27 @@ class BlankPageDetector:
         text = page.text_content.lower()
         title = (page.title or "").lower()
         
+        # More specific error indicators to avoid false positives
         error_indicators = [
-            "404", "not found", "page not found", "error", "oops",
+            "404", "not found", "page not found", "oops",
             "something went wrong", "access denied", "forbidden",
-            "internal server error", "500", "502", "503", "504"
+            "internal server error", "server error", "temporarily unavailable"
         ]
         
-        return any(indicator in text or indicator in title for indicator in error_indicators)
+        # Check for HTTP status codes in context (not just standalone numbers)
+        status_code_patterns = [
+            "error 500", "error 502", "error 503", "error 504",
+            "http 500", "http 502", "http 503", "http 504",
+            "status 500", "status 502", "status 503", "status 504"
+        ]
+        
+        # Check for generic error indicators
+        has_error_indicator = any(indicator in text or indicator in title for indicator in error_indicators)
+        
+        # Check for HTTP status codes in proper context
+        has_status_code = any(pattern in text for pattern in status_code_patterns)
+        
+        return has_error_indicator or has_status_code
     
     def _is_redirect_page(self, page: PageContent) -> bool:
         """Check if page is a redirect page"""

@@ -48,6 +48,12 @@ class PageContent(BaseModel):
     has_navigation: bool = False
     content_chunks: List[str] = []
     extracted_at: datetime = datetime.now()
+    
+    # New fields for path tracking and HTML structure
+    path: List[str] = []  # Click path to reach this page
+    crawled_at: Optional[str] = None  # When this page was crawled
+    session_id: Optional[str] = None  # Crawl session ID
+    html_structure: Optional[Dict[str, Any]] = None  # Extracted HTML structure
 
 class EvaluationResult(BaseModel):
     url: str

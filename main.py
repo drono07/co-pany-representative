@@ -15,6 +15,8 @@ from validators import LinkValidator, BlankPageDetector, ContentAnalyzer
 from content_processor import ContentProcessor
 from evaluation_system import EvaluationOrchestrator
 from config import settings
+from database import get_database
+from change_detector import ChangeDetector
 
 # Set up logging
 logging.basicConfig(
@@ -37,10 +39,21 @@ class WebsiteInsightsPlatform:
         self.content_analyzer = ContentAnalyzer()
         self.content_processor = ContentProcessor()
         self.evaluation_orchestrator = EvaluationOrchestrator()
+        self.db = None
+        self.change_detector = ChangeDetector()
     
-    async def analyze_website(self, url: str, max_depth: int = None, include_screenshots: bool = False) -> Dict[str, Any]:
+    async def analyze_website(self, url: str, max_depth: int = None, include_screenshots: bool = False, max_pages_to_crawl: int = None, max_links_to_validate: int = None) -> Dict[str, Any]:
         """Main method to analyze a website comprehensively"""
         logger.info(f"Starting comprehensive analysis of {url}")
+        
+        # Connect to MongoDB if enabled
+        if settings.enable_mongodb_storage:
+            try:
+                self.db = await get_database()
+                logger.info("Connected to MongoDB successfully")
+            except Exception as e:
+                logger.warning(f"Failed to connect to MongoDB: {e}. Continuing without MongoDB storage.")
+                self.db = None
         
         # Create debug directory
         debug_dir = Path("debug_output")
@@ -50,7 +63,7 @@ class WebsiteInsightsPlatform:
         try:
             # Step 1: Crawl the website
             logger.info("Step 1: Crawling website...")
-            crawl_results = await self._crawl_website(url, max_depth)
+            crawl_results = await self._crawl_website(url, max_depth, max_pages_to_crawl, max_links_to_validate)
             
             # Save crawl results for debugging
             crawl_debug_file = debug_dir / f"crawl_results_{timestamp}.json"
@@ -143,6 +156,10 @@ class WebsiteInsightsPlatform:
             # Step 5: Create analysis object
             analysis = self._create_analysis_object(url, processed_pages, validated_links)
             
+            # Step 5.5: Save to MongoDB and detect changes (if enabled)
+            if self.db:
+                await self._save_to_mongodb_and_detect_changes(url, crawl_results, processed_pages, analysis)
+            
             # Step 6: Run AI evaluations (limited to configured number of pages)
             if settings.enable_ai_evaluation:
                 logger.info(f"Step 5: Running AI evaluations on {min(settings.max_ai_evaluation_pages, len(processed_pages))} pages...")
@@ -159,7 +176,7 @@ class WebsiteInsightsPlatform:
                 final_report['summary']['ai_evaluated_pages'] = len(pages_for_ai)
             else:
                 logger.info("Step 5: AI evaluation disabled")
-                final_report = self._create_basic_report(analysis)
+                final_report = self._create_basic_report(analysis, crawl_results.get('path_tracking', {}))
             
             logger.info("Website analysis completed successfully")
             return final_report
@@ -168,10 +185,10 @@ class WebsiteInsightsPlatform:
             logger.error(f"Error during website analysis: {e}")
             raise
     
-    async def _crawl_website(self, url: str, max_depth: int = None) -> Dict[str, Any]:
+    async def _crawl_website(self, url: str, max_depth: int = None, max_pages_to_crawl: int = None, max_links_to_validate: int = None) -> Dict[str, Any]:
         """Crawl the website and extract all pages and links"""
         async with WebsiteCrawler() as crawler:
-            return await crawler.crawl_website(url, max_depth)
+            return await crawler.crawl_website(url, max_depth, max_pages_to_crawl, max_links_to_validate)
     
     async def _validate_links(self, links) -> list:
         """Validate all discovered links"""
@@ -301,6 +318,83 @@ class WebsiteInsightsPlatform:
             links=links
         )
     
+    async def _save_to_mongodb_and_detect_changes(self, url: str, crawl_results: Dict, processed_pages: list, analysis: WebsiteAnalysis):
+        """Save crawl data to MongoDB and detect changes from previous runs"""
+        try:
+            # Get previous crawl session for comparison
+            previous_session = await self.db.get_previous_crawl_session(url)
+            
+            # Save current crawl session
+            session_data = {
+                "session_id": crawl_results.get("session_id", f"crawl_{datetime.now().strftime('%Y%m%d_%H%M%S')}"),
+                "website_url": url,
+                "max_depth": crawl_results.get("max_depth", 1),
+                "created_at": datetime.now().isoformat(),
+                "total_pages": crawl_results.get("total_pages", 0),
+                "total_visited": crawl_results.get("total_visited", 0),
+                "error_rate": crawl_results.get("error_rate", 0),
+                "path_tracking": crawl_results.get("path_tracking", {})
+            }
+            
+            session_id = await self.db.save_crawl_session(session_data)
+            logger.info(f"Crawl session saved with ID: {session_id}")
+            
+            # Save page data to MongoDB
+            for page in processed_pages:
+                page_data = {
+                    "session_id": session_data["session_id"],
+                    "url": page.url,
+                    "title": page.title,
+                    "word_count": page.word_count,
+                    "page_type": page.page_type.value,
+                    "path": getattr(page, 'path', []),
+                    "crawled_at": getattr(page, 'crawled_at', datetime.now().isoformat()),
+                    "html_structure": getattr(page, 'html_structure', None),
+                    "has_header": page.has_header,
+                    "has_footer": page.has_footer,
+                    "has_navigation": page.has_navigation,
+                    "content_chunks": page.content_chunks
+                }
+                await self.db.save_page_data(page_data)
+            
+            logger.info(f"Saved {len(processed_pages)} pages to MongoDB")
+            
+            # Detect changes if previous session exists
+            if previous_session:
+                logger.info("Detecting changes from previous crawl...")
+                previous_pages = await self.db.get_pages_from_session(previous_session["session_id"])
+                
+                # Set pages for comparison
+                self.change_detector.set_current_pages([page.dict() for page in processed_pages])
+                self.change_detector.set_previous_pages(previous_pages)
+                
+                # Detect changes
+                changes = self.change_detector.detect_changes()
+                
+                # Save change detection results
+                change_data = {
+                    "website_url": url,
+                    "current_session_id": session_data["session_id"],
+                    "previous_session_id": previous_session["session_id"],
+                    "detected_at": datetime.now().isoformat(),
+                    "changes": changes
+                }
+                
+                change_id = await self.db.save_change_detection(change_data)
+                logger.info(f"Change detection results saved with ID: {change_id}")
+                
+                # Print change report
+                print("\n" + "="*80)
+                print("CHANGE DETECTION REPORT")
+                print("="*80)
+                print(self.change_detector.get_change_report())
+                print("="*80)
+            else:
+                logger.info("No previous crawl data found for comparison")
+                
+        except Exception as e:
+            logger.error(f"Failed to save to MongoDB or detect changes: {e}")
+    
     def _select_pages_for_ai_evaluation(self, pages: list) -> list:
         """Select pages for AI evaluation, prioritizing content pages"""
         # Prioritize pages with actual content
@@ -318,7 +412,7 @@ class WebsiteInsightsPlatform:
         logger.info(f"Selected {len(selected_pages)} pages for AI evaluation: {len(content_pages)} content pages, {len(selected_pages) - len(content_pages)} other pages")
         return selected_pages
     
-    def _create_basic_report(self, analysis: WebsiteAnalysis) -> Dict[str, Any]:
+    def _create_basic_report(self, analysis: WebsiteAnalysis, path_tracking: Dict[str, Any] = None) -> Dict[str, Any]:
         """Create a basic report without AI evaluation"""
         # Filter out rate-limited links from broken links
         broken_links = [link for link in analysis.links if link.status.value == 'broken' and link.status_code != 429]
@@ -386,6 +480,13 @@ class WebsiteInsightsPlatform:
                         'response_time': link.response_time
                     } for link in broken_links
                 ],
+                'valid_links': [
+                    {
+                        'url': link.url, 
+                        'status_code': link.status_code, 
+                        'response_time': link.response_time
+                    } for link in analysis.links if link.status.value == 'valid'
+                ],
                 'blank_pages': [
                     {
                         'url': page.url, 
@@ -393,7 +494,9 @@ class WebsiteInsightsPlatform:
                         'title': page.title,
                         'has_header': page.has_header,
                         'has_footer': page.has_footer,
-                        'has_navigation': page.has_navigation
+                        'has_navigation': page.has_navigation,
+                        'html_content': getattr(page, 'html_content', ''),
+                        'path': getattr(page, 'path', [])
                     } for page in blank_pages
                 ],
                 'content_pages': [
@@ -403,7 +506,9 @@ class WebsiteInsightsPlatform:
                         'title': page.title,
                         'has_header': page.has_header,
                         'has_footer': page.has_footer,
-                        'has_navigation': page.has_navigation
+                        'has_navigation': page.has_navigation,
+                        'html_content': getattr(page, 'html_content', ''),
+                        'path': getattr(page, 'path', [])
                     } for page in content_pages
                 ],
                 'rate_limited_links': [
@@ -450,7 +555,8 @@ class WebsiteInsightsPlatform:
                     'estimated_effort': 'High',
                     'expected_impact': 'Medium'
                 }
-            ] if total_issues > 0 else []
+            ] if total_issues > 0 else [],
+            'path_tracking': path_tracking or {}
         }
     
     async def _capture_screenshots(self, pages: list) -> Dict[str, str]:
