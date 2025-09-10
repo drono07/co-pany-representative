@@ -22,8 +22,7 @@ from api_models import (
     SourceCodeResponse, HighlightedLink, ParentChildRelationships, AnalysisStatus
 )
 from database_schema import get_database, DatabaseManager
-from analysis_engine import AnalysisEngine
-from celery_tasks import run_website_analysis, get_task_status
+from celery_tasks import run_website_analysis
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
