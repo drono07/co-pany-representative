@@ -55,45 +55,18 @@ class WebsiteInsightsPlatform:
                 logger.warning(f"Failed to connect to MongoDB: {e}. Continuing without MongoDB storage.")
                 self.db = None
         
-        # Create debug directory
-        debug_dir = Path("debug_output")
-        debug_dir.mkdir(exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         try:
             # Step 1: Crawl the website
             logger.info("Step 1: Crawling website...")
             crawl_results = await self._crawl_website(url, max_depth, max_pages_to_crawl, max_links_to_validate)
             
-            # Save crawl results for debugging
-            crawl_debug_file = debug_dir / f"crawl_results_{timestamp}.json"
-            with open(crawl_debug_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'total_visited': crawl_results.get('total_visited', 0),
-                    'total_pages': crawl_results.get('total_pages', 0),
-                    'links_count': len(crawl_results.get('links', [])),
-                    'pages_count': len(crawl_results.get('pages', [])),
-                    'all_links': [{'url': link.url, 'status': link.status.value, 'title': getattr(link, 'title', '')} for link in crawl_results.get('links', [])],
-                    'all_pages': [{'url': page.url, 'title': page.title, 'word_count': page.word_count, 'page_type': getattr(page, 'page_type', {}).value if hasattr(page, 'page_type') else 'unknown'} for page in crawl_results.get('pages', [])]
-                }, f, indent=2, ensure_ascii=False, default=str)
-            logger.info(f"Crawl results saved to {crawl_debug_file}")
             
             # Step 2: Validate links (always run for all pages)
             if settings.enable_link_validation:
                 logger.info("Step 2: Validating links...")
                 validated_links = await self._validate_links(crawl_results['links'])
                 
-                # Save link validation results for debugging
-                link_debug_file = debug_dir / f"link_validation_{timestamp}.json"
-                broken_links = [link for link in validated_links if link.status.value == 'broken']
-                with open(link_debug_file, 'w', encoding='utf-8') as f:
-                    json.dump({
-                        'total_links': len(validated_links),
-                        'broken_links_count': len(broken_links),
-                        'broken_links': [{'url': link.url, 'status_code': link.status_code, 'error': link.error_message} for link in broken_links],
-                        'valid_links_count': len([link for link in validated_links if link.status.value == 'valid'])
-                    }, f, indent=2, ensure_ascii=False, default=str)
-                logger.info(f"Link validation results saved to {link_debug_file}")
             else:
                 logger.info("Step 2: Link validation disabled")
                 validated_links = crawl_results['links']
@@ -103,27 +76,6 @@ class WebsiteInsightsPlatform:
                 logger.info("Step 3: Detecting blank pages...")
                 analyzed_pages = self._detect_blank_pages(crawl_results['pages'])
                 
-                # Save blank page detection results for debugging
-                blank_debug_file = debug_dir / f"blank_pages_{timestamp}.json"
-                blank_pages = [page for page in analyzed_pages if page.page_type.value == 'blank']
-                content_pages = [page for page in analyzed_pages if page.page_type.value == 'content']
-                error_pages = [page for page in analyzed_pages if page.page_type.value == 'error']
-                redirect_pages = [page for page in analyzed_pages if page.page_type.value == 'redirect']
-                
-                with open(blank_debug_file, 'w', encoding='utf-8') as f:
-                    json.dump({
-                        'total_pages': len(analyzed_pages),
-                        'blank_pages_count': len(blank_pages),
-                        'content_pages_count': len(content_pages),
-                        'error_pages_count': len(error_pages),
-                        'redirect_pages_count': len(redirect_pages),
-                        'blank_pages': [{'url': page.url, 'title': page.title, 'word_count': page.word_count, 'has_header': page.has_header, 'has_footer': page.has_footer, 'has_navigation': page.has_navigation} for page in blank_pages],
-                        'content_pages': [{'url': page.url, 'title': page.title, 'word_count': page.word_count, 'has_header': page.has_header, 'has_footer': page.has_footer, 'has_navigation': page.has_navigation} for page in content_pages],
-                        'error_pages': [{'url': page.url, 'title': page.title, 'word_count': page.word_count} for page in error_pages],
-                        'redirect_pages': [{'url': page.url, 'title': page.title, 'word_count': page.word_count} for page in redirect_pages],
-                        'all_pages_detailed': [{'url': page.url, 'title': page.title, 'word_count': page.word_count, 'page_type': page.page_type.value, 'has_header': page.has_header, 'has_footer': page.has_footer, 'has_navigation': page.has_navigation} for page in analyzed_pages]
-                    }, f, indent=2, ensure_ascii=False, default=str)
-                logger.info(f"Blank page detection results saved to {blank_debug_file}")
             else:
                 logger.info("Step 3: Blank page detection disabled")
                 analyzed_pages = crawl_results['pages']
@@ -133,22 +85,6 @@ class WebsiteInsightsPlatform:
                 logger.info("Step 4: Processing content...")
                 processed_pages = self._process_content(analyzed_pages)
                 
-                # Save content processing results for debugging
-                content_debug_file = debug_dir / f"content_processing_{timestamp}.json"
-                with open(content_debug_file, 'w', encoding='utf-8') as f:
-                    json.dump({
-                        'total_pages': len(processed_pages),
-                        'sample_pages': [{
-                            'url': page.url, 
-                            'title': page.title, 
-                            'word_count': page.word_count,
-                            'page_type': page.page_type.value,
-                            'has_header': page.has_header,
-                            'has_footer': page.has_footer,
-                            'content_chunks_count': len(page.content_chunks) if hasattr(page, 'content_chunks') else 0
-                        } for page in processed_pages[:5]]
-                    }, f, indent=2, ensure_ascii=False, default=str)
-                logger.info(f"Content processing results saved to {content_debug_file}")
             else:
                 logger.info("Step 4: Content processing disabled")
                 processed_pages = analyzed_pages
