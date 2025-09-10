@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Analysis Platform - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-card p {
+            color: #666;
+            font-size: 1rem;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .chart-container h2 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        
+        .applications-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .application-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .application-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .application-card h3 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .application-card p {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-running {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status-completed {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .status-failed {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: opacity 0.3s ease;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+        
+        .validation-info {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            padding: 0.5rem;
+            border-radius: 5px;
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Website Analysis Platform</h1>
+        <p>Monitor your website health and performance</p>
+    </div>
+    
+    <div class="container">
+        <div id="loading" class="loading">
+            <p>Loading dashboard...</p>
+        </div>
+        
+        <div id="error" class="error" style="display: none;">
+            <p>Error loading dashboard. Please check your authentication.</p>
+        </div>
+        
+        <div id="dashboard" style="display: none;">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3 id="total-applications">0</h3>
+                    <p>Total Applications</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="total-runs">0</h3>
+                    <p>Total Analysis Runs</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="active-schedules">0</h3>
+                    <p>Active Schedules</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="broken-links">0</h3>
+                    <p>Broken Links</p>
+                </div>
+            </div>
+            
+            <!-- Charts -->
+            <div class="chart-container">
+                <h2>Analysis Trends</h2>
+                <canvas id="trendsChart" width="400" height="200"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h2>Issue Distribution</h2>
+                <canvas id="issuesChart" width="400" height="200"></canvas>
+            </div>
+            
+            <!-- Recent Runs -->
+            <div class="chart-container">
+                <h2>Recent Analysis Runs</h2>
+                <div id="recent-runs">
+                    <!-- Recent runs will be populated here -->
+                </div>
+            </div>
+            
+            <!-- Applications -->
+            <div class="chart-container">
+                <h2>Your Applications</h2>
+                <div class="applications-grid" id="applications-grid">
+                    <!-- Applications will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // API Configuration
+        const API_BASE_URL = 'http://localhost:8000';
+        let authToken = localStorage.getItem('authToken');
+        
+        // Check if user is authenticated
+        if (!authToken) {
+            window.location.href = '/login.html';
+        }
+        
+        // API Helper Functions
+        async function apiCall(endpoint, options = {}) {
+            const url = `${API_BASE_URL}${endpoint}`;
+            const config = {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                },
+                ...options
+            };
+            
+            try {
+                const response = await fetch(url, config);
+                if (response.status === 401) {
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('API call failed:', error);
+                throw error;
+            }
+        }
+        
+        // Load Dashboard Data
+        async function loadDashboard() {
+            try {
+                const stats = await apiCall('/dashboard');
+                if (!stats) return;
+                
+                // Update stats
+                document.getElementById('total-applications').textContent = stats.total_applications;
+                document.getElementById('total-runs').textContent = stats.total_runs;
+                document.getElementById('active-schedules').textContent = stats.active_schedules;
+                document.getElementById('broken-links').textContent = stats.top_issues.broken_links;
+                
+                // Load applications
+                const applications = await apiCall('/applications');
+                if (applications) {
+                    displayApplications(applications);
+                }
+                
+                // Load recent runs
+                displayRecentRuns(stats.recent_runs);
+                
+                // Create charts
+                createTrendsChart(stats.recent_runs);
+                createIssuesChart(stats.top_issues);
+                
+                // Show dashboard
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+        
+        // Display Applications
+        function displayApplications(applications) {
+            const grid = document.getElementById('applications-grid');
+            grid.innerHTML = '';
+            
+            applications.forEach(app => {
+                const card = document.createElement('div');
+                card.className = 'application-card';
+                card.innerHTML = `
+                    <h3>${app.name}</h3>
+                    <p>${app.description || 'No description'}</p>
+                    <p><strong>URL:</strong> ${app.website_url}</p>
+                    <p><strong>Max Pages:</strong> ${app.max_pages_to_crawl}</p>
+                    <p><strong>Max Links:</strong> ${app.max_links_to_validate}</p>
+                    <p><strong>Max Depth:</strong> ${app.max_crawl_depth}</p>
+                    <div class="validation-info">
+                        <small>💡 Links should be 2-3x pages for comprehensive validation</small>
+                    </div>
+                    <button class="btn" onclick="startAnalysis('${app._id}')">Start Analysis</button>
+                    <button class="btn btn-secondary" onclick="viewRuns('${app._id}')">View Runs</button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+        
+        // Display Recent Runs
+        function displayRecentRuns(runs) {
+            const container = document.getElementById('recent-runs');
+            container.innerHTML = '';
+            
+            runs.forEach(run => {
+                const runElement = document.createElement('div');
+                runElement.className = 'application-card';
+                runElement.innerHTML = `
+                    <h3>Run ${run._id.substring(0, 8)}...</h3>
+                    <p><strong>Status:</strong> <span class="status-badge status-${run.status}">${run.status}</span></p>
+                    <p><strong>Started:</strong> ${new Date(run.started_at || run.created_at).toLocaleString()}</p>
+                    <p><strong>Pages Analyzed:</strong> ${run.total_pages_analyzed || 0}</p>
+                    <p><strong>Overall Score:</strong> ${run.overall_score || 0}/100</p>
+                `;
+                container.appendChild(runElement);
+            });
+        }
+        
+        // Create Trends Chart
+        function createTrendsChart(runs) {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            const labels = runs.map(run => new Date(run.created_at).toLocaleDateString());
+            const scores = runs.map(run => run.overall_score || 0);
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Overall Score',
+                        data: scores,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Create Issues Chart
+        function createIssuesChart(issues) {
+            const ctx = document.getElementById('issuesChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Broken Links', 'Blank Pages', 'Other Issues'],
+                    datasets: [{
+                        data: [issues.broken_links, issues.blank_pages, 0],
+                        backgroundColor: ['#ff6b6b', '#4ecdc4', '#45b7d1']
+                    }]
+                },
+                options: {
+                    responsive: true
+                }
+            });
+        }
+        
+        // Start Analysis
+        async function startAnalysis(appId) {
+            try {
+                const result = await apiCall(`/applications/${appId}/runs`, {
+                    method: 'POST'
+                });
+                alert('Analysis started successfully!');
+                loadDashboard(); // Refresh dashboard
+            } catch (error) {
+                alert('Failed to start analysis');
+            }
+        }
+        
+        // View Runs
+        function viewRuns(appId) {
+            window.location.href = `/runs.html?appId=${appId}`;
+        }
+        
+        // Initialize Dashboard
+        document.addEventListener('DOMContentLoaded', loadDashboard);
+    </script>
+</body>
+</html>
