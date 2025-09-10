@@ -1,3 +1,14 @@
+"""
+Configuration settings for Website Insights Platform
+
+IMPORTANT: When using the frontend, you only need minimal .env settings!
+- Essential: OPENAI_API_KEY, MONGODB_URI, ENABLE_MONGODB_STORAGE
+- Optional: Crawler performance settings (MAX_CRAWL_DEPTH, etc.)
+- Local testing: Analysis settings (only when running main.py directly)
+
+All analysis parameters (crawl depth, page limits, etc.) come from the frontend UI.
+"""
+
 import os
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
