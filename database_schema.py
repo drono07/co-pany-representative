@@ -339,6 +339,8 @@ class DatabaseManager:
             await self.db.link_validations.delete_many({"run_id": str(run_id)})
             await self.db.change_detections.delete_many({"run_id": str(run_id)})
             await self.db.crawl_sessions.delete_many({"run_id": str(run_id)})
+            await self.db.page_source_codes.delete_many({"run_id": str(run_id)})
+            await self.db.parent_child_relationships.delete_many({"run_id": str(run_id)})
             
             # Delete the run itself
             result = await self.db.analysis_runs.delete_one({"_id": run_id})
