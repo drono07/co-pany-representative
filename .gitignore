@@ -36,6 +36,7 @@ logs/
 
 # Debug Output
 debug_output/
+*.json
 
 # IDE
 .vscode/
