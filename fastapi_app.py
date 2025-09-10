@@ -182,6 +182,10 @@ async def create_application(
         "max_links_to_validate": app_data.max_links_to_validate,
         "enable_ai_evaluation": app_data.enable_ai_evaluation,
         "max_ai_evaluation_pages": app_data.max_ai_evaluation_pages,
+        "extract_static_links": app_data.extract_static_links,
+        "extract_dynamic_links": app_data.extract_dynamic_links,
+        "extract_resource_links": app_data.extract_resource_links,
+        "extract_external_links": app_data.extract_external_links,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
         "is_active": True
@@ -390,6 +394,10 @@ async def start_analysis_run(
         "max_links_to_validate": application["max_links_to_validate"],
         "enable_ai_evaluation": application["enable_ai_evaluation"],
         "max_ai_evaluation_pages": application["max_ai_evaluation_pages"],
+        "extract_static_links": application.get("extract_static_links", True),
+        "extract_dynamic_links": application.get("extract_dynamic_links", False),
+        "extract_resource_links": application.get("extract_resource_links", False),
+        "extract_external_links": application.get("extract_external_links", False),
         "name": application["name"],
         "user_email": current_user["email"],
         "send_notifications": False
