@@ -283,6 +283,50 @@ class DatabaseManager:
         )
         return result.modified_count > 0
     
+    # Legacy methods for main.py compatibility
+    async def get_previous_crawl_session(self, website_url: str) -> Optional[dict]:
+        """Get the most recent crawl session for a website (legacy method)"""
+        try:
+            # Use crawl_sessions collection
+            session = await self.db.crawl_sessions.find_one(
+                {"website_url": website_url},
+                sort=[("created_at", -1)]
+            )
+            if session:
+                return convert_objectid_to_str(session)
+            return None
+        except Exception as e:
+            logger.error(f"Error getting previous crawl session: {e}")
+            return None
+    
+    async def save_crawl_session(self, session_data: dict) -> str:
+        """Save a new crawl session (legacy method)"""
+        try:
+            result = await self.db.crawl_sessions.insert_one(session_data)
+            return str(result.inserted_id)
+        except Exception as e:
+            logger.error(f"Error saving crawl session: {e}")
+            raise
+    
+    async def get_pages_from_session(self, session_id: str) -> List[dict]:
+        """Get all pages from a specific crawl session (legacy method)"""
+        try:
+            cursor = self.db.pages.find({"session_id": session_id})
+            pages = await cursor.to_list(length=None)
+            return [convert_objectid_to_str(page) for page in pages]
+        except Exception as e:
+            logger.error(f"Error getting pages from session: {e}")
+            return []
+    
+    async def save_page_data(self, page_data: dict) -> str:
+        """Save page data (legacy method)"""
+        try:
+            result = await self.db.pages.insert_one(page_data)
+            return str(result.inserted_id)
+        except Exception as e:
+            logger.error(f"Error saving page data: {e}")
+            raise
+    
     async def delete_analysis_run(self, run_id: str) -> bool:
         """Delete an analysis run and all related data"""
         try:
