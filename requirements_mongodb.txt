@@ -1,0 +1,15 @@
+# Core dependencies
+aiohttp>=3.8.0
+beautifulsoup4>=4.11.0
+pydantic>=1.10.0
+pydantic-settings>=2.0.0
+tqdm>=4.64.0
+openai>=1.0.0
+python-dotenv>=1.0.0
+
+# MongoDB dependencies
+pymongo>=4.14.0
+motor>=3.7.0
+
+# Optional dependencies for enhanced features
+dnspython>=2.8.0

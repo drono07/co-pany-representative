@@ -1,490 +1,297 @@
-# Website Insights Platform
+# Website Analysis Platform
 
-A comprehensive website analysis platform that crawls websites, identifies issues, and provides AI-powered evaluations across multiple dimensions including content quality, design, accessibility, SEO, technical performance, security, and more.
+A comprehensive FastAPI-based platform for automated website analysis with **Celery task queue**, **Redis broker**, **MongoDB storage**, and **automated scheduling**.
 
-## 📋 Table of Contents
+## 🚀 Features
 
-- [Features](#features)
-- [Installation](#installation)
-- [🎯 Local Demo Website Testing](#-local-demo-website-testing)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Output Format](#output-format)
-- [Troubleshooting](#troubleshooting)
-- [🚀 Quick Demo Commands](#-quick-demo-commands)
-- [Roadmap](#roadmap)
+### Core Features
+- **Multi-User Support**: User registration, authentication, and role-based access
+- **Application Management**: Create and manage multiple website analysis applications
+- **Celery Task Queue**: Robust background task processing with Redis
+- **Automated Scheduling**: Celery Beat for cron-based scheduling
+- **Real-time Dashboard**: Visual dashboard with charts and statistics
+- **API-First Design**: RESTful API for all operations
+- **Context Comparison**: Compare analysis results between runs
+- **Task Monitoring**: Real-time task status and worker monitoring
 
-## Features
+### Analysis Features
+- **Website Crawling**: Recursive link discovery with configurable depth
+- **Link Validation**: HTTP status checking with retry logic
+- **Blank Page Detection**: Advanced HTML structure analysis
+- **Change Detection**: Compare results between analysis runs
+- **Path Tracking**: Track navigation paths to each page
+- **HTML Structure Storage**: Store clean HTML structure for comparison
 
-### 🔍 **Website Crawling**
-- Recursive crawling of all internal links
-- Configurable depth limits
-- Concurrent request handling
-- Duplicate link detection
-- Response time tracking
+## 📋 Prerequisites
 
-### 🔗 **Link Validation**
-- Automatic detection of broken links (4xx, 5xx status codes)
-- Link status categorization (valid, broken, redirect, timeout)
-- Response time analysis
-- Error message capture
+- Python 3.8+
+- Redis (for Celery broker and result backend)
+- MongoDB (for data storage)
+- Docker (optional, for containerized deployment)
 
-### 📄 **Content Analysis**
-- Blank page detection (pages with only header/footer)
-- Content quality assessment
-- HTML to Markdown conversion
-- Content chunking for AI processing
-- Word count and structure analysis
+## 🛠️ Quick Setup
 
-### 🤖 **AI-Powered Evaluation Agents**
-
-#### 1. **Content Quality Agent**
-- Evaluates content depth and substance
-- Analyzes readability and clarity
-- Assesses information value and usefulness
-- Checks grammar and writing quality
-- Reviews content structure and organization
-
-#### 2. **Design & Layout Agent**
-- Analyzes visual hierarchy and spacing
-- Evaluates layout consistency
-- Reviews header/footer design
-- Assesses navigation structure
-- Checks white space usage and typography
-
-#### 3. **Accessibility Agent**
-- WCAG compliance assessment
-- Semantic HTML structure analysis
-- Alt text coverage evaluation
-- Heading hierarchy review
-- Keyboard navigation support
-- Screen reader compatibility
-
-#### 4. **SEO Agent**
-- Title tag optimization
-- Meta description analysis
-- Heading structure evaluation
-- Keyword density assessment
-- Internal linking analysis
-- Schema markup detection
-
-#### 5. **Technical Performance Agent**
-- HTML structure validation
-- CSS organization analysis
-- JavaScript implementation review
-- Performance optimization indicators
-- Security considerations
-- Mobile optimization assessment
-
-#### 6. **Conversion Optimization Agent**
-- Call-to-action effectiveness
-- Value proposition clarity
-- Trust signals evaluation
-- User journey optimization
-- Form design analysis
-- Mobile conversion experience
-
-#### 7. **Security Agent**
-- HTTPS implementation
-- Form security (CSRF protection)
-- XSS vulnerability assessment
-- Input validation review
-- Content Security Policy analysis
-- Authentication mechanisms
-
-#### 8. **Brand Consistency Agent**
-- Tone of voice consistency
-- Brand messaging alignment
-- Visual identity consistency
-- Target audience alignment
-- Competitive differentiation
-- Brand story coherence
-
-### 📊 **Comprehensive Reporting**
-- Overall website score calculation
-- Category-specific scores
-- Priority-based issue categorization
-- Actionable recommendations
-- Detailed findings and metrics
-- Phased action plan generation
-
-## Installation
-
-1. **Clone the repository**
+### 1. Install Dependencies
 ```bash
-git clone <repository-url>
-cd website-insights
+pip install -r requirements_fastapi.txt
 ```
 
-2. **Install dependencies**
+### 2. Start Services
 ```bash
-pip install -r requirements.txt
+# Start Redis (choose one)
+brew services start redis                    # macOS
+docker run -d -p 6379:6379 redis:alpine     # Docker
+sudo systemctl start redis-server           # Ubuntu/Debian
+
+# Start the platform
+./start.sh
 ```
 
-3. **Set up environment variables**
+### 3. Access the Platform
+- **API**: http://localhost:8000
+- **Dashboard**: http://localhost:8000/dashboard.html
+- **API Docs**: http://localhost:8000/docs
+
+## 🎯 Default Configuration
+
+The platform comes with sensible defaults:
+
+### Crawler Defaults
+- **MAX_PAGES_TO_CRAWL**: 500 pages
+- **MAX_LINKS_TO_VALIDATE**: 1500 links (3x pages for comprehensive validation)
+- **MAX_CRAWL_DEPTH**: 1 (shallow crawl for performance)
+- **ENABLE_AI_EVALUATION**: false (disabled by default)
+
+### Validation Rules
+- **MAX_LINKS_TO_VALIDATE** should be **2-3x** the value of **MAX_PAGES_TO_CRAWL**
+- This ensures comprehensive link validation without overwhelming the system
+- Frontend will show validation messages for proper configuration
+
+## 📚 API Usage
+
+### Authentication
+
+#### Register User
 ```bash
-cp env.example .env
-# Edit .env and add your OpenAI API key
+curl -X POST "http://localhost:8000/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "name": "John Doe",
+    "password": "securepassword"
+  }'
 ```
 
-4. **Configure settings**
-Edit the `.env` file with your preferences:
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-MAX_CRAWL_DEPTH=3
-MAX_CONCURRENT_REQUESTS=10
-REQUEST_TIMEOUT=30
-USER_AGENT=WebsiteInsightsBot/1.0
-
-# AI Evaluation Settings
-ENABLE_AI_EVALUATION=true
-MAX_AI_EVALUATION_PAGES=10
-
-# Non-AI Analysis Settings (always run for all pages)
-ENABLE_LINK_VALIDATION=true
-ENABLE_BLANK_PAGE_DETECTION=true
-ENABLE_CONTENT_ANALYSIS=true
-```
-
-## 🎯 Local Demo Website Testing
-
-### **Demo Overview**
-The platform includes a professional demo website (`demo_website/`) designed to showcase all analysis features including:
-- Rich content pages
-- Blank pages (header/footer only)
-- Empty pages (minimal content)
-- Broken links (404 errors)
-- Various content types for comprehensive testing
-
-### **🚀 Quick Demo Setup**
-
-#### **Option 1: Interactive Demo Script**
+#### Login
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Run the interactive demo
-python demo_script.py
+curl -X POST "http://localhost:8000/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword"
+  }'
 ```
 
-#### **Option 2: Manual Demo**
+### Application Management
+
+#### Create Application
 ```bash
-# Start demo website server
-cd demo_website
-python -m http.server 8080 &
-
-# Run analysis (in new terminal)
-cd ..
-source venv/bin/activate
-python main.py "http://localhost:8080" --depth 1
+curl -X POST "http://localhost:8000/applications" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Website",
+    "description": "Main website analysis",
+    "website_url": "https://example.com"
+  }'
 ```
 
-### **🌐 Demo Website Pages**
+### Analysis with Celery Tasks
 
-| Page | URL | Content Type | Purpose |
-|------|-----|--------------|---------|
-| **Home** | `http://localhost:8080/` | Rich Content (200+ words) | Shows good content detection |
-| **About** | `http://localhost:8080/about.html` | Rich Content (500+ words) | Demonstrates comprehensive content |
-| **Services** | `http://localhost:8080/services.html` | Rich Content (200+ words) | Shows service page analysis |
-| **Blank Page** | `http://localhost:8080/blank-page.html` | Blank (39 words) | Tests blank page detection |
-| **Empty Page** | `http://localhost:8080/empty-page.html` | Empty (41 words) | Tests minimal content detection |
-| **Broken Links** | Various 404 pages | Broken (404 errors) | Tests broken link detection |
-
-### **📊 Expected Demo Results**
-
-When analyzing the demo website, you should see:
-
-```
-================================================================================
-WEBSITE ANALYSIS SUMMARY
-================================================================================
-Website: http://localhost:8080
-Overall Score: 0.0/100
-
-PAGE ANALYSIS:
-  Total Pages: 6
-  Total Links: 17
-  Broken Links: 11
-  Rate Limited Links: 0
-  Blank Pages: 2
-  Content Pages: 2
-  AI Evaluated Pages: 0
-
-CRITICAL ISSUES:
-  ⚠️  Broken link (HTTP 404): http://localhost:8080/portfolio.html
-  ⚠️  Broken link (HTTP 404): http://localhost:8080/pricing.html
-  ⚠️  Broken link (HTTP 404): http://localhost:8080/contact.html
-
-MAJOR ISSUES:
-  ⚠️  Blank page (only 39 words): http://localhost:8080/blank-page.html
-  ⚠️  Blank page (only 41 words): http://localhost:8080/empty-page.html
-```
-
-### **📁 Demo Results Storage**
-
-Results are saved to:
-- **Main Report**: `website_analysis_localhost:8080_YYYYMMDD_HHMMSS.json`
-- **Debug Files**: `debug_output/` directory
-- **Full Path**: `/Users/dhruvyadav/Desktop/website-insights/`
-
-### **🎬 Demo Presentation Guide**
-
-#### **Step 1: Show Demo Website (2 minutes)**
-1. Open browser to `http://localhost:8080`
-2. Navigate through different pages:
-   - Home page (rich content)
-   - About page (comprehensive content)
-   - Services page (moderate content)
-   - Blank page (header/footer only)
-   - Empty page (minimal content)
-3. Show navigation with broken links
-
-#### **Step 2: Run Analysis (1 minute)**
+#### Start Analysis (Queued Task)
 ```bash
-python main.py "http://localhost:8080" --depth 1
-```
-- Show real-time crawling progress
-- Highlight speed (3-second analysis)
-- Display comprehensive discovery
-
-#### **Step 3: Review Results (3 minutes)**
-- Show summary statistics
-- Explain broken link detection (11 found)
-- Highlight blank page identification (2 found)
-- Display content page recognition (2 found)
-- Show actionable recommendations
-
-#### **Step 4: Show Report (2 minutes)**
-- Open JSON report file
-- Show detailed findings
-- Explain issue categorization
-- Highlight recommendations
-
-### **💼 Demo Talking Points**
-
-- **"Watch as we discover 6 pages and 17 links in just 3 seconds"**
-- **"Notice how it automatically identifies 11 broken links"**
-- **"See how it detects 2 blank pages that need content"**
-- **"The system provides specific recommendations for each issue"**
-- **"This analysis would take hours to do manually"**
-
-### **🔧 Demo Troubleshooting**
-
-#### **Common Issues:**
-1. **Port 8080 in use**: Change port in demo script
-2. **Server not starting**: Check if Python is installed
-3. **Analysis fails**: Ensure virtual environment is activated
-4. **Browser can't connect**: Verify server is running
-
-#### **Backup Plans:**
-- Have pre-generated reports ready
-- Use screenshots of previous analyses
-- Show configuration options
-- Demonstrate with real websites
-
-### **📈 Demo Success Metrics**
-
-- ✅ **Fast Analysis**: 3-second analysis of 6 pages
-- ✅ **Accurate Detection**: 11 broken links, 2 blank pages
-- ✅ **Clear Results**: Easy to understand summary
-- ✅ **Professional Output**: Formatted reports
-- ✅ **No Technical Issues**: Smooth execution
-- ✅ **Realistic Scenarios**: Mix of good and bad pages
-
-### **🎯 Client Value Demonstration**
-
-1. **Time Savings**: Manual checking vs automated analysis
-2. **Comprehensive Coverage**: Finds issues humans might miss
-3. **Actionable Insights**: Clear recommendations for improvement
-4. **Professional Reports**: Detailed JSON with categorization
-5. **Scalable Solution**: Works for any website size
-
-## Usage
-
-### Command Line Interface
-
-**Basic analysis:**
-```bash
-python main.py https://example.com
+curl -X POST "http://localhost:8000/applications/{app_id}/runs" \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-**Advanced analysis with custom depth:**
-```bash
-python main.py https://example.com --depth 5 --screenshots
-```
-
-**Save report to specific file:**
-```bash
-python main.py https://example.com --output my_report.json
-```
-
-**Quiet mode (no console output):**
-```bash
-python main.py https://example.com --quiet
-```
-
-### Programmatic Usage
-
-```python
-import asyncio
-from main import WebsiteInsightsPlatform
-
-async def analyze_website():
-    platform = WebsiteInsightsPlatform()
-    report = await platform.analyze_website("https://example.com")
-    
-    # Save report
-    platform.save_report(report, "analysis_report.json")
-    
-    # Print summary
-    platform.print_summary(report)
-
-# Run analysis
-asyncio.run(analyze_website())
-```
-
-## Configuration Options
-
-### Crawling Settings
-- `MAX_CRAWL_DEPTH`: Maximum depth for recursive crawling (default: 3)
-- `MAX_CONCURRENT_REQUESTS`: Number of concurrent requests (default: 10)
-- `REQUEST_TIMEOUT`: Request timeout in seconds (default: 30)
-- `USER_AGENT`: User agent string for requests
-
-### AI Evaluation Settings
-- `OPENAI_API_KEY`: Your OpenAI API key (required)
-- `ENABLE_AI_EVALUATION`: Enable/disable AI evaluation (default: true)
-- `MAX_AI_EVALUATION_PAGES`: Maximum pages for AI evaluation (default: 10)
-- Model selection: GPT-4 for most agents, GPT-4-Vision for design analysis
-
-### Non-AI Analysis Settings
-- `ENABLE_LINK_VALIDATION`: Enable broken link detection (default: true)
-- `ENABLE_BLANK_PAGE_DETECTION`: Enable blank page detection (default: true)
-- `ENABLE_CONTENT_ANALYSIS`: Enable content processing (default: true)
-
-**Note**: Non-AI analysis runs on ALL discovered pages, while AI evaluation is limited to the configured number of pages for cost and performance reasons.
-
-## Output Format
-
-The platform generates comprehensive JSON reports containing:
-
+Response includes both `run_id` and `task_id`:
 ```json
 {
-  "website_url": "https://example.com",
-  "analysis_date": "2024-01-15T10:30:00",
-  "overall_score": 75.5,
-  "summary": {
-    "total_pages_analyzed": 25,
-    "total_links_found": 150,
-    "broken_links": 3,
-    "blank_pages": 2
-  },
-  "scores_by_category": {
-    "content_quality": 80.0,
-    "design_layout": 70.0,
-    "accessibility": 85.0,
-    "seo": 75.0,
-    "technical": 65.0
-  },
-  "issues": {
-    "critical": ["Security vulnerability found", "Broken checkout link"],
-    "major": ["Missing alt text on images", "Poor heading structure"],
-    "minor": ["Long page titles", "Inconsistent spacing"]
-  },
-  "recommendations": {
-    "high_priority": ["Fix security issues immediately", "Add missing alt text"],
-    "medium_priority": ["Improve heading structure", "Optimize page titles"],
-    "low_priority": ["Enhance visual consistency", "Add more internal links"]
-  },
-  "action_plan": [
-    {
-      "phase": "Immediate (1-3 days)",
-      "priority": "Critical",
-      "actions": ["Fix security vulnerabilities", "Repair broken links"],
-      "estimated_effort": "High",
-      "expected_impact": "High"
-    }
-  ]
+  "message": "Analysis started",
+  "run_id": "run_123",
+  "task_id": "celery_task_456"
 }
 ```
 
-## Common Use Cases
+#### Monitor Task Status
+```bash
+curl -X GET "http://localhost:8000/tasks/{task_id}/status" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
 
-### 1. **Website Health Check**
-- Identify broken links and technical issues
-- Assess overall website performance
-- Get prioritized action plan
+### Scheduling
 
-### 2. **SEO Audit**
-- Analyze on-page SEO factors
-- Identify optimization opportunities
-- Review content structure and quality
+#### Create Schedule
+```bash
+curl -X POST "http://localhost:8000/applications/{app_id}/schedules" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "frequency": "daily",
+    "is_active": true
+  }'
+```
 
-### 3. **Accessibility Compliance**
-- WCAG compliance assessment
-- Screen reader compatibility
-- Keyboard navigation support
+## 🔧 Configuration
 
-### 4. **Content Quality Review**
-- Evaluate content depth and value
-- Check grammar and readability
-- Assess brand consistency
+### Environment Variables
+Create a `.env` file:
+```env
+# MongoDB Configuration
+MONGODB_URI=mongodb://localhost:27017/website_analysis_platform
 
-### 5. **Security Assessment**
-- Identify potential vulnerabilities
-- Review security best practices
-- Check for common security issues
+# Redis Configuration
+REDIS_URL=redis://localhost:6379/0
 
-### 6. **Conversion Optimization**
-- Analyze user experience factors
-- Evaluate call-to-action effectiveness
-- Review trust signals and credibility
+# Authentication
+SECRET_KEY=your-super-secret-key-here
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-## Advanced Features
+# Website Analysis Settings (with defaults)
+MAX_PAGES_TO_CRAWL=500
+MAX_LINKS_TO_VALIDATE=1500
+MAX_CRAWL_DEPTH=1
+ENABLE_AI_EVALUATION=false
+```
 
-### Multi-Agent Evaluation System
-- Parallel processing of multiple evaluation agents
-- Weighted scoring system
-- Comprehensive issue categorization
-- Priority-based recommendations
+### Application Settings
+```python
+{
+    "name": "Application Name",
+    "description": "Description",
+    "website_url": "https://example.com",
+    "max_crawl_depth": 1,           # 1-5 (default: 1)
+    "max_pages_to_crawl": 500,      # 10-1000 (default: 500)
+    "max_links_to_validate": 1500,  # 10-2000 (default: 1500, should be 2-3x pages)
+    "enable_ai_evaluation": false,  # true/false (default: false)
+    "max_ai_evaluation_pages": 10   # 1-50 (default: 10)
+}
+```
 
-### Content Processing
-- Intelligent content chunking
-- HTML to Markdown conversion
-- Semantic content analysis
-- Token-optimized processing
+### Validation Rules
+- **MAX_LINKS_TO_VALIDATE** should be **2-3x** **MAX_PAGES_TO_CRAWL**
+- Example: 500 pages → 1000-1500 links to validate
+- Frontend will show validation messages for proper configuration
 
-### Screenshot Analysis (Future)
-- Visual design evaluation
-- Layout consistency checking
-- Mobile responsiveness assessment
+## 🚀 Deployment
 
-## Troubleshooting
+### Docker Deployment
+```bash
+docker-compose up -d
+```
 
-### Common Issues
+### Manual Deployment
+```bash
+# Start Redis
+redis-server
 
-1. **OpenAI API Key Error**
-   - Ensure your API key is correctly set in the `.env` file
-   - Verify you have sufficient API credits
+# Start Celery Worker
+python celery_worker.py
 
-2. **Crawling Timeout**
-   - Increase `REQUEST_TIMEOUT` in configuration
-   - Reduce `MAX_CONCURRENT_REQUESTS`
-   - Check if the website blocks automated requests
+# Start Celery Beat
+python celery_beat.py
 
-3. **Memory Issues with Large Websites**
-   - Reduce `MAX_CRAWL_DEPTH`
-   - Process websites in smaller batches
-   - Increase system memory
+# Start FastAPI
+python fastapi_app.py
+```
 
-### Performance Optimization
+## 📊 Monitoring
 
-- Use appropriate `MAX_CONCURRENT_REQUESTS` for your system
-- Adjust `MAX_CRAWL_DEPTH` based on website size
-- Monitor API usage and costs
-- Use caching for repeated analyses
+### Task Status Endpoints
+- `GET /tasks/{task_id}/status` - Get task status
+- `GET /tasks/workers/stats` - Get worker statistics
+- `GET /health` - Platform health check
 
-## Contributing
+### Flower (Optional)
+```bash
+celery -A celery_app flower --port=5555
+# Access at: http://localhost:5555
+```
+
+## 🧪 Testing
+
+### Run Comprehensive Test
+```bash
+python test_celery_platform.py
+```
+
+### Test Individual Components
+```bash
+# Test API only
+python test_platform.py
+
+# Test Celery platform
+python test_celery_platform.py
+```
+
+## 🗄️ Database Schema
+
+### Collections
+- **users**: User accounts and authentication
+- **applications**: Website analysis applications
+- **schedules**: Automated analysis schedules
+- **analysis_runs**: Analysis execution records
+- **analysis_results**: Page analysis results
+- **link_validations**: Link validation results
+- **change_detections**: Change comparison results
+
+### Celery Integration
+- **Task Results**: Stored in Redis with configurable expiration
+- **Task Metadata**: Progress, status, and error information
+- **Worker Stats**: Real-time worker performance metrics
+
+## 🔒 Security
+
+### Authentication
+- JWT-based authentication with Redis session storage
+- Password hashing with bcrypt
+- Token expiration and refresh
+
+### Task Security
+- User-based task isolation
+- Application ownership validation
+- Secure task parameter passing
+
+## 🎯 Use Cases
+
+### 1. Website Monitoring
+- **Automated Health Checks**: Schedule daily/weekly analysis runs
+- **Issue Detection**: Monitor broken links, blank pages, and content quality
+- **Trend Analysis**: Track website health over time
+
+### 2. SEO Analysis
+- **Site Structure Analysis**: Understand navigation depth and page relationships
+- **Content Quality**: Identify pages with insufficient content
+- **Link Health**: Monitor internal and external link status
+
+### 3. Development Testing
+- **Pre-deployment Checks**: Validate website before going live
+- **Change Impact Analysis**: Compare before/after deployment results
+- **Performance Monitoring**: Track analysis metrics over time
+
+## 📈 Performance
+
+### Scaling
+- **Horizontal Scaling**: Add more Celery workers
+- **Queue Separation**: Different queues for different task types
+- **Load Balancing**: Distribute tasks across workers
+
+### Optimization
+- **Task Batching**: Group similar tasks together
+- **Result Expiration**: Configure Redis result expiration
+- **Worker Concurrency**: Tune worker concurrency settings
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -492,50 +299,34 @@ The platform generates comprehensive JSON reports containing:
 4. Add tests if applicable
 5. Submit a pull request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
-## Support
+## 🆘 Support
 
-For issues and questions:
-1. Check the troubleshooting section
-2. Review the logs in `website_insights.log`
-3. Open an issue on GitHub
-4. Contact the development team
+For support and questions:
+- Check the API documentation at `/docs`
+- Monitor Celery tasks with Flower
+- Review the logs for error details
+- Create an issue in the repository
 
-## 🚀 Quick Demo Commands
+## 🔄 Migration from Basic Version
 
-### **Start Demo Website**
-```bash
-cd demo_website
-python -m http.server 8080 &
-```
+To migrate from the basic website analysis tool:
 
-### **Run Analysis**
-```bash
-python main.py "http://localhost:8080" --depth 1
-```
+1. **Install dependencies**: `pip install -r requirements_fastapi.txt`
+2. **Start Redis**: `brew services start redis` or `docker run -d -p 6379:6379 redis:alpine`
+3. **Start platform**: `./start.sh`
+4. **Create applications**: Use the API to create applications for your websites
+5. **Setup schedules**: Configure automated analysis runs
 
-### **Interactive Demo**
-```bash
-python demo_script.py
-```
+The platform maintains backward compatibility with the existing analysis engine while adding robust task queue and scheduling capabilities with Celery and Redis.
 
-### **Expected Results**
-- **Pages**: 6 pages discovered
-- **Links**: 17 links found
-- **Issues**: 11 broken links, 2 blank pages
-- **Time**: ~3 seconds
-- **Report**: `website_analysis_localhost:8080_YYYYMMDD_HHMMSS.json`
 
-## Roadmap
 
-- [ ] Screenshot capture and analysis
-- [ ] Performance metrics integration
-- [ ] Database storage for historical analysis
-- [ ] Web interface for report visualization
-- [ ] API endpoints for integration
-- [ ] Batch processing capabilities
-- [ ] Custom evaluation criteria
-- [ ] Integration with popular CMS platforms
+
+
+# NOTE: 1. apply wait for lazy loading or page need to be load. 
+        2. we need to identify parent link and store parent children relationship using list or mapping
+        3. edit option enable in the application 
