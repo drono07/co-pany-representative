@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     max_links_to_validate: int = int(os.getenv("MAX_LINKS_TO_VALIDATE", "1500"))  # Default: 1500 links (3x pages for comprehensive validation)
     
     # MongoDB Settings
-    mongodb_uri: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017/website_analysis")
+    mongodb_uri: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017/website_analysis_platform")
     enable_mongodb_storage: bool = os.getenv("ENABLE_MONGODB_STORAGE", "true").lower() == "true"
     
     class Config:
