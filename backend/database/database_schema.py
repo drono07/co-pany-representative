@@ -117,6 +117,21 @@ class DatabaseManager:
                 IndexModel([("previous_run_id", ASCENDING)])
             ])
             
+            # Page source codes collection indexes
+            await self.db.page_source_codes.create_indexes([
+                IndexModel([("run_id", ASCENDING), ("page_url", ASCENDING)], unique=True),
+                IndexModel([("run_id", ASCENDING)]),
+                IndexModel([("page_url", ASCENDING)]),
+                IndexModel([("created_at", DESCENDING)])
+            ])
+            
+            # Parent child relationships collection indexes
+            await self.db.parent_child_relationships.create_indexes([
+                IndexModel([("run_id", ASCENDING)], unique=True),
+                IndexModel([("start_url", ASCENDING)]),
+                IndexModel([("created_at", DESCENDING)])
+            ])
+            
             logger.info("Database indexes created successfully")
             
         except Exception as e:
