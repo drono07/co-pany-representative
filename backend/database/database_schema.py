@@ -648,21 +648,23 @@ class DatabaseManager:
                 "content_length": len(source_code)
             }
             
-            # Use insert_one instead of replace_one for better error handling
-            # First, try to delete any existing record
-            await self.db.page_source_codes.delete_one({
-                "run_id": run_id, 
-                "page_url": page_url
-            })
+            # Use replace_one with upsert=True to handle duplicate key errors
+            # This will either insert a new record or update an existing one
+            result = await self.db.page_source_codes.replace_one(
+                {
+                    "run_id": run_id, 
+                    "page_url": page_url
+                },
+                source_data,
+                upsert=True
+            )
             
-            # Then insert the new record
-            result = await self.db.page_source_codes.insert_one(source_data)
-            
-            if result.inserted_id:
-                logger.info(f"Successfully saved source code for {page_url} (ID: {result.inserted_id})")
+            if result.upserted_id or result.modified_count > 0:
+                action = "inserted" if result.upserted_id else "updated"
+                logger.info(f"Successfully {action} source code for {page_url}")
                 return True
             else:
-                logger.error(f"Failed to save source code for {page_url} - no inserted_id returned")
+                logger.error(f"Failed to save source code for {page_url} - no changes made")
                 return False
                 
         except Exception as e:
