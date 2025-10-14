@@ -135,7 +135,11 @@ class DatabaseManager:
             logger.info("Database indexes created successfully")
             
         except Exception as e:
-            logger.error(f"Failed to create indexes: {e}")
+            # Check if it's just an index conflict (index already exists)
+            if "Index already exists with a different name" in str(e):
+                logger.info("Database indexes already exist - skipping creation")
+            else:
+                logger.error(f"Failed to create indexes: {e}")
     
     # User operations
     async def create_user(self, user_data: dict) -> str:
