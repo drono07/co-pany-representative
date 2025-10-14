@@ -630,7 +630,7 @@ class DatabaseManager:
         """Save HTML source code for a page"""
         try:
             # Check if database connection is working
-            if not self.db:
+            if self.db is None:
                 logger.error("Database connection is None!")
                 return False
             
