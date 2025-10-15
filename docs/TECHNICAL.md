@@ -64,11 +64,18 @@ The Website Analysis Platform is a comprehensive system for analyzing websites, 
 
 ### Web Scraping & Parsing:
 - **aiohttp**: Async HTTP client for web requests
-  - *Why*: Non-blocking HTTP requests, handles thousands of concurrent requests
+  - *Used in*: `backend/core/crawler.py` for fetching web pages during crawling
+  - *Used in*: `backend/core/validators.py` for validating links and checking HTTP status codes
+  - *Used in*: `backend/core/main.py` for manual URL validation with retry logic
+  - *What it does*: Makes HTTP GET requests to fetch HTML content, handles rate limiting (429 errors), manages timeouts, and provides response status codes
 - **BeautifulSoup4**: HTML parsing library
-  - *Why*: Robust HTML parsing, handles malformed HTML gracefully
+  - *Used in*: `backend/core/crawler.py` for extracting links from HTML content
+  - *Used in*: `backend/core/validators.py` for extracting page titles from HTML
+  - *Used in*: `backend/core/content_processor.py` for parsing HTML structure and content
+  - *What it does*: Parses HTML content to extract links, titles, and page structure information
 - **tqdm**: Progress bars for long-running operations
-  - *Why*: User feedback during analysis progress
+  - *Used in*: `backend/core/crawler.py` and `backend/core/validators.py` for showing progress during analysis
+  - *What it does*: Displays progress bars in terminal during web crawling and link validation processes
 
 ### Frontend:
 - **React**: Modern JavaScript framework
