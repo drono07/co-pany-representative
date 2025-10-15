@@ -352,6 +352,343 @@ Optimized Approach:
 
 ---
 
+## 📋 API Models & Data Structures
+
+### Model Architecture Overview
+
+The platform uses a **two-tier model system** for data validation and processing:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    API Layer Models                        │
+│              (backend/api/api_models.py)                   │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
+│  │   Request       │  │   Response      │  │   Database   │ │
+│  │   Models        │  │   Models        │  │   Models     │ │
+│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Utility Models                             │
+│              (backend/utils/models.py)                     │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
+│  │   Core Data     │  │   Enums &       │  │   Business   │ │
+│  │   Structures    │  │   Constants     │  │   Logic      │ │
+│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### API Models (`backend/api/api_models.py`)
+
+#### 1. **User Management Models**
+
+**Purpose**: Handle user authentication and authorization
+
+```python
+# Base user model with common fields
+class UserBase(BaseModel):
+    email: str
+    name: str
+    role: UserRole = UserRole.USER
+
+# For creating new users (includes password)
+class UserCreate(UserBase):
+    password: str
+
+# Complete user model (returned by API)
+class User(UserBase):
+    id: str
+    created_at: datetime
+    is_active: bool = True
+```
+
+**Connection Flow**:
+```
+UserCreate → Database → User (response)
+```
+
+#### 2. **Application Models**
+
+**Purpose**: Manage website analysis applications with comprehensive configuration
+
+```python
+class ApplicationBase(BaseModel):
+    name: str
+    website_url: HttpUrl
+    max_crawl_depth: int = Field(default=1, ge=1, le=5)
+    max_pages_to_crawl: int = Field(default=500, ge=10, le=1000)
+    max_links_to_validate: int = Field(default=1500, ge=10, le=2000)
+    
+    # Link extraction configuration
+    extract_static_links: bool = Field(default=True)
+    extract_dynamic_links: bool = Field(default=False)
+    extract_resource_links: bool = Field(default=False)
+    extract_external_links: bool = Field(default=False)
+```
+
+**Key Features**:
+- **Validation**: Ensures `max_links_to_validate` is 2-5x `max_pages_to_crawl`
+- **Link Extraction Control**: Configurable link discovery strategies
+- **Performance Limits**: Prevents resource exhaustion
+
+**Model Hierarchy**:
+```
+ApplicationBase → ApplicationCreate → Database → Application (response)
+                → ApplicationUpdate (partial updates)
+```
+
+#### 3. **Analysis Run Models**
+
+**Purpose**: Track analysis execution and results
+
+```python
+class AnalysisRunBase(BaseModel):
+    application_id: str
+    status: AnalysisStatus = AnalysisStatus.PENDING
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+
+class AnalysisRun(AnalysisRunBase):
+    id: str
+    created_at: datetime
+    # Analysis results
+    total_pages_analyzed: Optional[int] = None
+    total_links_found: Optional[int] = None
+    broken_links_count: Optional[int] = None
+    overall_score: Optional[float] = None
+```
+
+**Status Flow**:
+```
+PENDING → RUNNING → COMPLETED/FAILED
+```
+
+#### 4. **Source Code Models (Hierarchical System)**
+
+**Purpose**: Handle hierarchical source code storage and retrieval
+
+```python
+class SourceCodeResponse(BaseModel):
+    page_url: str
+    source_code: str
+    parent_url: Optional[str] = None
+    highlighted_links: List[HighlightedLink] = []
+    actual_source_page: str  # Which page actually has the source
+    is_source_from_parent: bool  # Whether source is from parent
+    traversal_path: List[str]  # Path taken to find source
+    hierarchy_depth: int  # How many levels up we went
+```
+
+**Hierarchical Logic**:
+```
+Request for Page A → Check if Page A has source → If not, traverse to parent → Return parent's source with metadata
+```
+
+#### 5. **Parent-Child Relationship Models**
+
+**Purpose**: Manage URL hierarchy and navigation paths
+
+```python
+class ParentChildRelationships(BaseModel):
+    parent_map: Dict[str, Optional[str]] = {}  # child_url -> parent_url
+    children_map: Dict[str, List[str]] = {}    # parent_url -> [child_urls]
+    path_map: Dict[str, List[str]] = {}        # url -> [path_to_root]
+```
+
+**Usage**:
+- **parent_map**: Find parent of any URL
+- **children_map**: Find all children of a parent
+- **path_map**: Get complete navigation path to root
+
+### Utility Models (`backend/utils/models.py`)
+
+#### 1. **Core Data Structures**
+
+**Purpose**: Provide reusable data models for business logic
+
+```python
+class Link(BaseModel):
+    url: str
+    status_code: Optional[int] = None
+    status: LinkStatus = LinkStatus.UNKNOWN
+    link_type: LinkType = LinkType.STATIC_HTML
+    title: Optional[str] = None
+    depth: int = 0
+    parent_url: Optional[str] = None
+    response_time: Optional[float] = None
+    error_message: Optional[str] = None
+    discovered_at: datetime = datetime.now()
+    source_context: Optional[str] = None
+```
+
+**Connection to API Models**:
+```
+Link (utils) → LinkValidation (api) → Database
+```
+
+#### 2. **Page Content Models**
+
+```python
+class PageContent(BaseModel):
+    url: str
+    title: Optional[str] = None
+    html_content: str
+    markdown_content: Optional[str] = None
+    text_content: str
+    word_count: int
+    page_type: PageType = PageType.CONTENT
+    has_header: bool = False
+    has_footer: bool = False
+    has_navigation: bool = False
+    content_chunks: List[str] = []
+    path: List[str] = []  # Click path to reach this page
+    html_structure: Optional[Dict[str, Any]] = None
+```
+
+**Connection to API Models**:
+```
+PageContent (utils) → AnalysisResult (api) → Database
+```
+
+#### 3. **Enum Definitions**
+
+**Purpose**: Provide type safety and validation constants
+
+```python
+class LinkStatus(str, Enum):
+    VALID = "valid"
+    BROKEN = "broken"
+    REDIRECT = "redirect"
+    TIMEOUT = "timeout"
+    RATE_LIMITED = "rate_limited"
+    UNKNOWN = "unknown"
+
+class LinkType(str, Enum):
+    STATIC_HTML = "static_html"  # From a, link, area tags
+    DYNAMIC_JS = "dynamic_js"    # From JavaScript
+    RESOURCE = "resource"        # Images, CSS, JS files
+    EXTERNAL = "external"        # Links to external domains
+
+class PageType(str, Enum):
+    CONTENT = "content"
+    BLANK = "blank"
+    ERROR = "error"
+    REDIRECT = "redirect"
+```
+
+### Model Relationships & Data Flow
+
+#### 1. **Analysis Request Flow**
+
+```
+Frontend Request → ApplicationCreate → Database → Application
+                → AnalysisRunCreate → Celery Task → AnalysisRun
+```
+
+#### 2. **Data Processing Flow**
+
+```
+Crawler → Link (utils) → LinkValidation (api) → Database
+       → PageContent (utils) → AnalysisResult (api) → Database
+       → ParentChildRelationships (api) → Database
+       → SourceCodeResponse (api) → Database (hierarchical)
+```
+
+#### 3. **Response Flow**
+
+```
+Database → API Models → JSON Response → Frontend
+```
+
+### Key Design Patterns
+
+#### 1. **Base Model Pattern**
+```python
+# Common fields in base class
+class ApplicationBase(BaseModel):
+    name: str
+    website_url: HttpUrl
+    # ... common fields
+
+# Specialized models inherit from base
+class ApplicationCreate(ApplicationBase):
+    pass  # No additional fields
+
+class ApplicationUpdate(BaseModel):
+    name: Optional[str] = None  # Only updatable fields
+    # ... other optional fields
+
+class Application(ApplicationBase):
+    id: str  # Additional fields for responses
+    created_at: datetime
+    # ... response-specific fields
+```
+
+#### 2. **Validation Pattern**
+```python
+@field_validator('max_links_to_validate')
+@classmethod
+def validate_links_to_pages_ratio(cls, v, info):
+    """Validate business rules"""
+    if info.data and 'max_pages_to_crawl' in info.data:
+        pages = info.data['max_pages_to_crawl']
+        if v < pages * 2:
+            raise ValueError(f'max_links_to_validate ({v}) should be at least 2x max_pages_to_crawl ({pages})')
+    return v
+```
+
+#### 3. **Hierarchical Data Pattern**
+```python
+# Source code with metadata about hierarchy
+class SourceCodeResponse(BaseModel):
+    page_url: str  # Requested URL
+    source_code: str  # Actual HTML content
+    actual_source_page: str  # Where content came from
+    is_source_from_parent: bool  # Whether it's from parent
+    traversal_path: List[str]  # Path taken to find source
+    hierarchy_depth: int  # How many levels up
+```
+
+### Model Usage in API Endpoints
+
+#### 1. **Request Validation**
+```python
+@app.post("/applications", response_model=Application)
+async def create_application(application: ApplicationCreate):
+    # Pydantic automatically validates ApplicationCreate
+    # Ensures all required fields are present and valid
+    return await db.create_application(application)
+```
+
+#### 2. **Response Serialization**
+```python
+@app.get("/runs/{run_id}/source-code", response_model=SourceCodeResponse)
+async def get_source_code(run_id: str, page_url: str):
+    # Returns properly formatted SourceCodeResponse
+    # Includes hierarchical metadata
+    return await db.get_page_source_code(run_id, page_url)
+```
+
+#### 3. **Error Handling**
+```python
+# Pydantic automatically returns 422 for validation errors
+# Custom validation in models provides clear error messages
+```
+
+### Benefits of This Model Architecture
+
+1. **Type Safety**: Pydantic ensures data integrity
+2. **Automatic Validation**: Request/response validation without manual code
+3. **API Documentation**: FastAPI auto-generates OpenAPI docs from models
+4. **Separation of Concerns**: API models vs utility models
+5. **Hierarchical Optimization**: Smart source code storage
+6. **Extensibility**: Easy to add new fields and validation rules
+7. **Consistency**: Standardized data structures across the platform
+
+---
+
 ## ⚙️ Background Tasks
 
 ### Celery Configuration (`backend/tasks/celery_app.py`):
