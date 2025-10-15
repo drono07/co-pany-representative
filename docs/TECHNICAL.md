@@ -696,7 +696,7 @@ async def get_source_code(run_id: str, page_url: str):
 
 ---
 
-## ⚙️ Background Tasks
+## ⚙️ Background Tasks --> Celery / Cron task 
 
 ### Celery Configuration (`backend/tasks/celery_app.py`):
 ```python
