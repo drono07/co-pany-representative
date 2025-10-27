@@ -696,7 +696,24 @@ async def get_source_code(run_id: str, page_url: str):
 
 ---
 
-## ⚙️ Background Tasks --> Celery / Cron task 
+## ⚙️ Background Tasks (Celery Task Queue)
+
+### What Are Background Tasks?
+
+This project uses **Celery** (NOT traditional cron jobs) for running background tasks. Here's the difference:
+
+#### **Celery vs Cron:**
+- **Celery**: Uses Redis as a message broker to queue and distribute tasks to worker processes
+- **Cron**: Scheduled tasks that run at specific times (doesn't use message brokers)
+- **Why Celery**: Better for long-running tasks, supports task queuing, and allows multiple workers
+
+#### **How Background Tasks Work:**
+```
+1. User requests analysis → FastAPI creates Celery task
+2. Task goes to Redis queue → Celery worker picks it up
+3. Worker processes the analysis → Updates status in database
+4. Frontend polls for results → Displays progress to user
+```
 
 ### Celery Configuration (`backend/tasks/celery_app.py`):
 ```python
@@ -1076,14 +1093,71 @@ brew install node  # macOS
 
 ### Starting Required Services:
 
-**Redis:**
+**Redis Setup (IMPORTANT - Required for Celery):**
+
+Redis is a message broker used by Celery to queue and manage background tasks. You MUST have Redis running before starting the platform.
+
+#### **Installation:**
+
+**macOS (recommended)**:
 ```bash
-# macOS
+# Install Redis using Homebrew
+brew install redis
+
+# Start Redis service (runs automatically on boot)
 brew services start redis
 
-# Or using Docker
-docker run -d -p 6379:6379 redis:alpine
+# Verify Redis is running
+redis-cli ping
+# Should return: PONG
 ```
+
+**Ubuntu/Linux**:
+```bash
+# Install Redis
+sudo apt-get update
+sudo apt-get install redis-server
+
+# Start Redis service
+sudo systemctl start redis
+
+# Verify Redis is running
+redis-cli ping
+# Should return: PONG
+```
+
+**Windows**:
+```bash
+# Download Redis from: https://github.com/microsoftarchive/redis/releases
+# Or use Windows Subsystem for Linux (WSL) and follow Ubuntu instructions
+```
+
+**Using Docker (Alternative)**:
+```bash
+# Run Redis in a Docker container
+docker run -d -p 6379:6379 --name redis redis:alpine
+
+# Verify Redis is running
+docker ps | grep redis
+```
+
+#### **What Redis Does in This Project:**
+- **Message Broker**: Queues Celery tasks for background processing
+- **Task Queue**: Holds analysis jobs until Celery workers can process them
+- **Coordination**: Manages task distribution across workers
+- **Required Port**: 6379 (default Redis port)
+
+#### **Verify Redis is Working:**
+```bash
+# Check if Redis is running
+redis-cli ping
+# Expected output: PONG
+
+# Check Redis connection details
+redis-cli INFO server
+```
+
+If you get "Connection refused" or "command not found", Redis is not installed or running!
 
 **MongoDB:**
 ```bash
