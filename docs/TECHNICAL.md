@@ -1025,17 +1025,124 @@ brew services start redis
 docker run -d -p 6379:6379 redis:alpine
 ```
 
-**MongoDB:**
+**MongoDB Setup (IMPORTANT - Required for Data Storage):**
+
+MongoDB is a NoSQL database used to store all analysis results, source codes, and relationships. You MUST have MongoDB running before starting the platform.
+
+#### **Installation:**
+
+**macOS (recommended)**:
 ```bash
-# macOS (recommended)
+# Install MongoDB using Homebrew
+brew tap mongodb/brew
+brew install mongodb-community
+
+# Start MongoDB service (runs automatically on boot)
 brew services start mongodb-community
 
-# Or use our helper script
-./scripts/start_mongodb.sh
-
-# Or manually
-mongod --dbpath /opt/homebrew/var/mongodb --logpath /opt/homebrew/var/log/mongodb/mongo.log --fork
+# Verify MongoDB is running
+mongosh --eval "db.runCommand('ping')"
+# Should return: { ok: 1 }
 ```
+
+**Ubuntu/Linux**:
+```bash
+# Import MongoDB public key
+wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo apt-key add -
+
+# Add MongoDB repository
+echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
+
+# Update package database
+sudo apt-get update
+
+# Install MongoDB
+sudo apt-get install -y mongodb-org
+
+# Start MongoDB service
+sudo systemctl start mongod
+sudo systemctl enable mongod
+
+# Verify MongoDB is running
+mongosh --eval "db.runCommand('ping')"
+# Should return: { ok: 1 }
+```
+
+**Windows**:
+```bash
+# Download MongoDB Community Server from: https://www.mongodb.com/try/download/community
+# Run the installer and follow the setup wizard
+# MongoDB will start automatically as a Windows service
+```
+
+**Using Docker (Alternative)**:
+```bash
+# Run MongoDB in a Docker container
+docker run -d -p 27017:27017 --name mongodb mongo:latest
+
+# Verify MongoDB is running
+docker ps | grep mongodb
+```
+
+#### **What MongoDB Does in This Project:**
+- **Stores Analysis Results**: All website analysis data, broken links, page content
+- **Source Code Storage**: HTML source codes with hierarchical optimization
+- **Relationship Data**: Parent-child URL relationships and navigation paths
+- **User Data**: Applications, analysis runs, and user information
+- **Required Port**: 27017 (default MongoDB port)
+
+#### **Verify MongoDB is Working:**
+```bash
+# Check if MongoDB is running
+mongosh --eval "db.runCommand('ping')"
+# Expected output: { ok: 1 }
+
+# Connect to MongoDB shell
+mongosh
+# You should see: Current Mongosh Log ID: [some-id]
+
+# List databases
+show dbs
+# Should show: website_analysis_platform (our main database)
+```
+
+#### **Using Our Helper Script:**
+```bash
+# We provide a helper script to start MongoDB
+./scripts/start_mongodb.sh
+```
+
+If you get "command not found" or connection errors, MongoDB is not installed or running!
+
+### Quick Setup Checklist for First-Time Users:
+
+**Before starting the platform, ensure these services are running:**
+
+1. **Redis** (Required for background tasks):
+   ```bash
+   redis-cli ping
+   # Should return: PONG
+   ```
+
+2. **MongoDB** (Required for data storage):
+   ```bash
+   mongosh --eval "db.runCommand('ping')"
+   # Should return: { ok: 1 }
+   ```
+
+3. **Python 3.8+** (Required for backend):
+   ```bash
+   python3 --version
+   # Should show Python 3.8 or higher
+   ```
+
+4. **Node.js** (Required for frontend):
+   ```bash
+   node --version
+   # Should show Node.js version
+   ```
+
+**If any service is missing, follow the installation instructions above!**
 
 ### Installation:
 ```bash
